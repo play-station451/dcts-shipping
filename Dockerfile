@@ -6,7 +6,7 @@ FROM oven/bun:1-slim
 
 WORKDIR /app
 
-COPY package.json bun.lockb ./
+#COPY package.json bun.lockb ./
 
 RUN bun install --frozen-lockfile --production
 
@@ -15,3 +15,4 @@ COPY . .
 EXPOSE 2052
 
 CMD ["bun", "."]
+

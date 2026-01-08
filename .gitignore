@@ -12,3 +12,4 @@
 privatekey.json
 
 .idea
+.package-lock.json

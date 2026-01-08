@@ -8,13 +8,14 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 
-RUN bun install --production
+RUN bun install --frozen-lockfile --production
 
 COPY . .
 
 EXPOSE 2052
 
 CMD ["bun", "."]
+
 
 
 

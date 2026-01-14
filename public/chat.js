@@ -21,7 +21,7 @@ var quillContainer = document.querySelector('.ql-container');
 var editor = document.querySelector('.ql-editor');
 
 var initialToolbarHeight
-var initialHeight ;
+var initialHeight;
 var maxHeight;
 var initialMargin
 var allowEditorBlur
@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     registerMessageInfiniteLoad(document.getElementById("content"))
     registerMessageCreateEvent();
+    initAudioPlayerEvents();
 
     customPrompts = new Prompt();
     tooltipSystem = new TooltipSystem();
@@ -117,26 +118,16 @@ document.addEventListener("DOMContentLoaded", async function () {
         var x = e.clientX;
         var y = e.clientY;
 
-        var emojiBox = document.getElementById("emoji-box-container");
         var clickedElement = document.elementFromPoint(x, y)
 
         if (clickedElement.id != "message-actions-image") {
             return;
         }
 
-        if (emojiBox.style.display == "flex") {
-            closeEmojiBox();
-        } else {
-            emojiBox.style.display = "flex";
-            selectEmojiTab(document.getElementById("emoji-box-emojis"))
-            getEmojis()
-
-            var test = document.getElementById("message-actions-image");
-
-            emojiBox.style.position = "fixed";
-            emojiBox.style.top = (y - emojiBox.offsetHeight - 40) + "px";
-            emojiBox.style.left = x - emojiBox.offsetWidth + "px";
-        }
+        showEmojiPicker(x,y, (emojiObj) => {
+            insertEmoji(emojiObj, true);
+            focusEditor();
+        })
     }
 
 
@@ -300,8 +291,10 @@ document.addEventListener("DOMContentLoaded", async function () {
             // emoji
             let emojiContainer = getEmojiContainerElement();
             if (emojiContainer?.style?.display === "flex" && !emojiContainer?.contains(data.element)) {
-                if (!data?.element?.id?.includes("message-actions-image")){
-                    emojiContainer.style.display = "none";
+                if (!data?.element?.id?.includes("message-actions-image") &&
+                    !data?.element?.classList?.contains("react")
+                ){
+                    closeEmojiBox();
                 }
             }
 
@@ -1849,27 +1842,6 @@ function sendGif(url) {
     focusEditor()
 }
 
-function closeEmojiBox() {
-    var emojiContainer = document.getElementById("emoji-box-container");
-    emojiContainer.style.display = "none";
-
-    var emojiEntryContainer = document.getElementById("emoji-entry-container");
-    var gifEntryContainer = document.getElementById("emoji-entry-container");
-    //emojiEntryContainer.innerHTML = "";
-
-    emojiEntryContainer.style.display = "flex";
-    gifEntryContainer.style.display = "none";
-
-    var emojiTab = document.getElementById("emoji-box-emojis");
-    var gifTab = document.getElementById("emoji-box-gifs");
-
-    try {
-        emojiTab.classList.add("SelectedTab");
-        gifTab.classList.remove("SelectedTab");
-    } catch (e) {
-        console.log(e)
-    }
-}
 
 
 function changeGIFSrc(url, element) {
@@ -1894,14 +1866,20 @@ function getGifs() {
 
 }
 
-function getEmojis() {
+async function getEmojis(callback = null) {
     var emojiContainer = getEmojiContainerElement()
     var emojiEntryContainer = document.getElementById("emoji-entry-container");
     var gifEntryContainer = document.getElementById("gif-entry-container");
     gifEntryContainer.innerHTML = "";
     gifEntryContainer.style.display = "none"
 
-    socket.emit("getEmojis", {id: UserManager.getID(), token: UserManager.getToken()}, function (response) {
+    let emojiEntries = emojiContainer.querySelectorAll(".emoji-entry")
+    emojiEntries.forEach(emoji => {
+        let clone = emoji.cloneNode(true);
+        emoji.replaceWith(clone);
+    })
+
+    socket.emit("getEmojis", {id: UserManager.getID(), token: UserManager.getToken()}, async function (response) {
 
         if (response.type === "success") {
             //settings_icon.value = response.msg;
@@ -1909,7 +1887,7 @@ function getEmojis() {
 
             //emojiEntryContainer.innerHTML = "";
             emojiEntryContainer.style.display = "flex";
-            response.data.reverse().forEach(emoji => {
+            for(let emoji of response.data.reverse()){
 
                 const base = emoji.filename.replace(/\.[^/.]+$/, "");
                 const parts = base.split("_");
@@ -1917,8 +1895,11 @@ function getEmojis() {
                 var emojiId = parts[0];
                 var emojiName = parts.length > 1 ? parts.slice(1).join("_") : parts[0];
 
+                let existingEmojiElement = emojiEntryContainer.querySelector(`.emoji-entry[data-hash="${emojiId}"]`);
+
                 if (hasEmojiInContainer(emojiId)) {
-                    return;
+                    if(existingEmojiElement) registerEmojiCallback(existingEmojiElement, emoji);
+                    continue;
                 }
 
                 const entry = document.createElement("div");
@@ -1936,14 +1917,11 @@ function getEmojis() {
                 imgWrap.appendChild(img);
                 entry.appendChild(imgWrap);
 
-                entry.addEventListener("click", () => {
-                    insertEmoji(emoji, true);
-                    focusEditor();
-                    emojiContainer.style.display = "none";
-                });
+                registerEmojiCallback(entry, emoji);
+
 
                 emojiEntryContainer.appendChild(entry);
-            })
+            }
 
             removeUnusedEmojisFromContainer(response)
 
@@ -1956,6 +1934,21 @@ function getEmojis() {
 
         console.log(response);
     });
+
+    function registerEmojiCallback(element, emojiObj){
+        console.log("Registered callback")
+        element.addEventListener("click", async () => {
+            if(!callback){
+                insertEmoji(emojiObj, true);
+                focusEditor();
+            }
+            else{
+                await callback(emojiObj);
+            }
+
+            if(getEmojiContainerElement()) getEmojiContainerElement().style.display = "none";
+        }, {once: true});
+    }
 }
 
 socket.on('receiveGroupBanner', function (data) {
@@ -2038,11 +2031,12 @@ async function getServerInfo(returnData = false) {
 
             servername = response.serverinfo.name;
             serverdesc = response.serverinfo.description;
+            let countryCode = response.serverinfo.countryCode;
 
             headline.innerHTML = `
 
             <div id="main_header">
-                ${sanitizeHtmlForRender(servername, false)} ${serverdesc ? ` - ${sanitizeHtmlForRender(serverdesc, false)}` : ""}
+                ${countryCode ? `${ChatManager.countryCodeToEmoji(countryCode)} ` : ""}${sanitizeHtmlForRender(servername, false)} ${serverdesc ? ` - ${sanitizeHtmlForRender(serverdesc, false)}` : ""}
             </div>
 
             <div id="badges"></div>          

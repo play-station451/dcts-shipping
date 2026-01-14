@@ -119,6 +119,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.warn("Couldnt get img embed src");
                 return;
             }
+
+            // no img viewer on reactions
+            if(data.element.parentNode?.classList?.contains("message-reaction-entry")) return;
+
+
             showImagePopup(src)
         }
     )
@@ -147,6 +152,27 @@ document.addEventListener("DOMContentLoaded", function () {
         ],
         async (data) => {
             handleVideoClick(data.event, data.element)
+        }
+    )
+
+    ContextMenu.registerClickEvent(
+        "message_reactions_toggler",
+        [
+            ".message-reaction-entry"
+        ],
+        async (data) => {
+            let messageId = findAttributeUp(data.element, "data-message-id");
+            let emojiHash = findAttributeUp(data.element, "data-emoji-hash")
+
+            let messageObj = await ChatManager.resolveMessage(messageId);
+            if(messageObj?.reactions.hasOwnProperty(emojiHash)){
+                if(messageObj.reactions[emojiHash]?.includes(UserManager.getID() )){
+                    removeMessageReaction(messageId, emojiHash)
+                }
+                else{
+                    addMessageReaction(messageId, emojiHash)
+                }
+            }
         }
     )
 
@@ -245,6 +271,11 @@ document.addEventListener("DOMContentLoaded", function () {
 })
 
 function registerMessageCreateEvent(){
+    socket.on('updateReactions', function (messageObj) {
+        updateMessageReactionsElementById(messageObj?.messageId);
+    });
+
+    
     socket.on('messageCreate', async function (message) {
         let container = document.getElementById("content");
         const isScrolledDown = isScrolledToBottom(container);
@@ -393,41 +424,22 @@ function editMessage(id) {
 }
 
 function getMemberIdFromElement(element) {
-    if (!element?.getAttribute("data-member-id")) {
-        element = element.parentNode;
-        if (!element?.getAttribute("data-member-id")) {
-            element = element.parentNode;
-            if (!element?.getAttribute("data-member-id")) {
-                element = element.parentNode;
-                if (!element?.getAttribute("data-member-id")) {
-                    console.warn("Couldnt edit message because data-member-id wasnt found");
-                    return null;
-                }
-            }
-        }
-    }
-
-    return element?.getAttribute("data-member-id")
+    return findAttributeUp(element, "data-member-id");
 }
 
-function getMessageIdFromElement(element) {
-    if (!element?.getAttribute("data-message-id")) {
+function findAttributeUp(element, attr, maxDepth = 10) {
+    for (let i = 0; i <= maxDepth && element; i++) {
+        const val = element.getAttribute?.(attr);
+        if (val !== null) return val;
         element = element.parentNode;
-        if (!element?.getAttribute("data-message-id")) {
-            element = element.parentNode;
-            if (!element?.getAttribute("data-message-id")) {
-                element = element.parentNode;
-                if (!element?.getAttribute("data-message-id")) {
-                    console.warn("Couldnt edit message because data-message-id wasnt found");
-                    return null;
-                }
-            }
-        }
-
-        return element.getAttribute("data-message-id");
     }
+    return null;
+}
 
-    return element?.getAttribute("data-message-id");
+
+
+function getMessageIdFromElement(element) {
+    return findAttributeUp(element, "data-message-id");
 }
 
 function getMessageElementFromId(messageId) {
@@ -690,6 +702,69 @@ function deleteMessageFromChat(id, type = "message") {
     });
 }
 
+async function updateMessageReactionsElementById(messageId, container = document.getElementById("content")){
+    let wasScrolledDown = isScrolledToBottom(container);
+
+    let contentContainer = document.querySelector(`.message-container .content:not(.reply)[data-message-id="${messageId}"]`);
+    let reactionRow = document.querySelector(`.message-reaction-row[data-message-id="${messageId}"]`);
+
+    let messageObj = await ChatManager.resolveMessage(messageId);
+    if(!messageObj) return console.error(`Couldnt find message object for message reaction update ${messageId}`);
+
+    // no reactions were present so add the container
+    if(!reactionRow) {
+        contentContainer.innerHTML += await getMessageReactionsHTML(messageObj);
+        reactionRow = document.querySelector(`.message-reaction-row[data-message-id="${messageId}"]`);
+    }
+
+    reactionRow.outerHTML = await getMessageReactionsHTML(messageObj);
+    if(wasScrolledDown) scrollDown()
+}
+
+async function getMessageReactionsHTML(messageObj){
+    if(!messageObj?.reactions || Object.keys(messageObj?.reactions)?.length === 0) return "";
+
+    let row = document.createElement("div");
+    row.innerHTML =
+        `
+        <div class="message-reaction-row" data-message-id="${messageObj.messageId}"></div>
+        `;
+
+    let reactionRowContainer = row.querySelector(".message-reaction-row");
+
+    for(let emojiHash in messageObj.reactions){
+        let emojiObj = findEmojiByID(emojiHash);
+        if(!emojiObj) {
+            console.error("Emoji Obj not found")
+            continue
+        }
+
+        reactionRowContainer.innerHTML += getEmojiReactionRowEntryHTML(messageObj, emojiObj);
+    }
+
+    return row.innerHTML;
+
+    function getEmojiReactionRowEntryHTML(messageObj, emojiObj){
+        let emojiPath = `/emojis/${emojiObj.filename}`;
+        let emojiDetails = extractEmojiDetails(emojiObj);
+        let emojiHash = emojiDetails[0]
+
+        if(!emojiHash){
+            console.error(`Emoji hash not found for emoji in reactions for message ${messageObj.messageId}: ${emojiObj?.filename} { ${emojiDetails}`)
+            return "";
+        }
+
+        let hasReacted = messageObj.reactions[emojiHash].includes(UserManager.getID());
+
+        return `
+            <div class="message-reaction-entry ${hasReacted ? 'reacted' : ""}" data-message-id="${messageObj.messageId}" data-emoji-hash="${emojiHash}">
+                <img class="inline-text-emoji" src="${emojiPath}">
+                <span>${messageObj.reactions[emojiHash]?.length}</span>
+            </div>    
+        `
+    }
+}
+
 async function createMsgHTML({
                                  message,
                                  append = false,
@@ -710,19 +785,30 @@ async function createMsgHTML({
         message.timestamp = message.ts;
     }
 
-    if(!message?.author?.name){
+    if(!message?.author?.name && message?.author?.id !== 0){
         message.author = await ChatManager.resolveMember(message?.author?.id) || message.author;
     }
 
-
     let isBanned = message?.author?.isBanned;
+    let messageReactionsRow = await getMessageReactionsHTML(message);
+
+    if(message.messageId === "160938858501") {
+        console.log(message);
+        console.log(messageReactionsRow);
+    }
+
     let messageRow =
         `
         <div class="content ${isSystem ? "system" : ""} ${waitWithDisplay ? "waitForDisplay" : ""}"  
             ${message?.plainText ? `data-plain-text="${encodeURIComponent(message.plainText)}"` : ""}
-            data-message-id="${message.messageId}" data-member-id="${message?.author?.id}" data-timestamp="${message.timestamp}">
+            data-message-id="${message.messageId}" 
+            data-member-id="${message?.author?.id}" 
+            data-timestamp="${message.timestamp}">
+            
             ${createActions === true ? createMsgActions(message?.author?.id, isSystem) : ""}
             ${sanitizeHtmlForRender(message.message)}  ${message?.editCode ? message?.editCode : ""}    
+            
+            ${messageReactionsRow ? messageReactionsRow : ""}
         </div>
         `
 
@@ -755,7 +841,7 @@ async function createMsgHTML({
     }
 
     return `
-        <div class="message-container ${isSystem ? "system" : ""} ${isBanned && message?.isAdmin ? "banned" : ""} ${waitWithDisplay ? "waitForDisplay" : ""}" data-member-id="${message.id}">
+        <div class="message-container ${isSystem ? "system" : ""} ${isBanned && message?.isAdmin ? "banned" : ""} ${waitWithDisplay ? "waitForDisplay" : ""}" data-member-id="${message?.author?.id}">
             
             ${replyCode}
             <div class="row ${isSystem === true ? `system` : ""}" data-message-id="${message?.messageId}" data-member-id="${message?.id}">
@@ -819,9 +905,80 @@ function actionReply(element) {
     replyToMessage(messageId);
 }
 
-function createMsgActions(id, isSystem = false) {
+function reactToMessageFromAction(element){
+    if(!element){
+        console.error("couldnt react to message from action as element wasnt found");
+        return;
+    }
+
+    let contentContainer = element.closest(".content");
+    if(!contentContainer){
+        console.error("couldnt react to message from action as content container wasnt found");
+        return;
+    }
+
+    let messageId = contentContainer.getAttribute("data-message-id");
+    let memberId = contentContainer.getAttribute("data-member-id");
+
+    let clientRec = element.getBoundingClientRect();
+    if(!messageId){
+        console.error("couldnt react to message from action as message id wasnt found");
+        return;
+    }
+
+    showEmojiPicker(clientRec.x, clientRec.y, async (emoji) => {
+        console.log("picked emoji: ", emoji);
+        let emojiDetails = extractEmojiDetails(emoji);
+        let emojiHash = emojiDetails[0]
+
+        addMessageReaction(messageId, emojiHash);
+    }, true);
+}
+
+async function addMessageReaction(messageId, emojiHash){
+    socket.emit("addMessageReaction", {
+        id: UserManager.getID(),
+        token: UserManager.getToken(),
+        messageId,
+        emojiHash
+    }, async (response) => {
+        if(response?.error){
+            console.log(response.error);
+            showSystemMessage({
+                title: "Error while reacting",
+                message: response.error,
+                type: "error"
+            })
+        }
+    })
+}
+
+async function searchParentElement(element, selector){
+
+}
+
+async function removeMessageReaction(messageId, emojiHash){
+    socket.emit("removeMessageReaction", {
+        id: UserManager.getID(),
+        token: UserManager.getToken(),
+        messageId,
+        emojiHash
+    }, async (response) => {
+        if(response?.error){
+            console.log(response.error);
+            showSystemMessage({
+                title: "Error while reacting",
+                message: response.error,
+                type: "error"
+            })
+        }
+    })
+}
+
+function createMsgActions(messageId, isSystem = false) {
 
     return `<div class="messageActions">
+                ${isSystem === false ? `<button style="" title="React" class="react" onclick="reactToMessageFromAction(this)">&#x1f412;</button>`: ""}
                 ${isSystem === false ? `<button style="" title="Reply" onclick="actionReply(this)">&#10149;</button>`: ""}
                 
                 <!--

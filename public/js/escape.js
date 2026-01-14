@@ -27,6 +27,7 @@ const SANITIZE_OPTIONS = {
         'em',
         'img',
         'mark',
+        "button",
         "iframe"
     ]
     ,

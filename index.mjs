@@ -433,6 +433,22 @@ const tables = [
         keys: [{name: "UNIQUE KEY", type: "messageId (messageId)"}],
     },
     {
+        name: "message_reactions",
+        columns: [
+            {name: "cid", type: "varchar(500) NOT NULL"},
+            {name: "reactionId", type: "int(100) NOT NULL"},
+            {name: "messageId", type: "varchar(100) NOT NULL"},
+            {name: "emojiHash", type: "longtext NOT NULL"},
+            {name: "memberId", type: "varchar(100) NOT NULL"},
+            {name: "react_timestamp", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"}
+        ],
+        keys: [
+            {name: "PRIMARY KEY", type: "(reactionId)"},
+            {name: "UNIQUE KEY", type: "cid (cid)"},
+        ],
+        autoIncrement: "reactionId int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1",
+    },
+    {
         name: "ip_cache",
         columns: [
             {name: "ip", type: "varchar(100) NOT NULL"},
@@ -464,7 +480,8 @@ const tables = [
             },
         ],
         keys: [
-            {name: "PRIMARY KEY", type: "(inboxId)"},
+
+
             {name: "UNIQUE KEY", type: "inboxId (inboxId)"},
             {name: "UNIQUE KEY", type: "customId (customId)"},
         ],
@@ -703,7 +720,7 @@ const tables = [
     {
         name: "members",
         columns: [
-            {name: "rowId", type: "int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY"},
+            {name: "rowId", type: "int(11) NOT NULL DEFAULT 0" },
             {name: "id", type: "varchar(100) NOT NULL UNIQUE"},
             {name: "token", type: "varchar(255)"},
             {name: "onboarding", type: "BOOLEAN DEFAULT FALSE"},
@@ -725,6 +742,10 @@ const tables = [
             {name: "isVerifiedKey", type: "BOOLEAN DEFAULT FALSE"},
             {name: "pow", type: "text DEFAULT ''"},
         ],
+        keys: [
+            {name: "PRIMARY KEY", type: "(rowId)"},
+        ],
+        autoIncrement: "rowId int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1",
     },
 ];
 

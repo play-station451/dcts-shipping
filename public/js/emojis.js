@@ -109,11 +109,6 @@ function startEmojiAutocompleteListener() {
     });
 }
 
-function hideSuggestions() {
-    const suggestionsContainer = document.getElementById("emoji-suggestions");
-    if (suggestionsContainer) suggestionsContainer.remove();
-}
-
 function findEmojiTrigger() {
     const range = quill.getSelection();
     if (!range) return null;
@@ -173,6 +168,59 @@ function extractEmojiDetails(emojiObj) {
     return [id, name];
 }
 
+function showEmojiPicker(x,y, callback, reverseHeight = false){
+    var emojiBox = document.getElementById("emoji-box-container");
+    if(!emojiBox) return;
+
+    if (emojiBox.style.display === "flex") {
+        closeEmojiBox();
+    } else {
+        emojiBox.style.display = "flex";
+        selectEmojiTab(document.getElementById("emoji-box-emojis"))
+        getEmojis(callback)
+        emojiBox.style.position = "fixed";
+
+        const margin = 8;
+        let top, left;
+
+        if (reverseHeight) {
+            top = y + 40;
+            left = x - (emojiBox.offsetWidth / 2);
+        } else {
+            top = y - emojiBox.offsetHeight - 40;
+            left = x - emojiBox.offsetWidth;
+        }
+
+        const maxTop = window.innerHeight - emojiBox.offsetHeight - margin;
+        const maxLeft = window.innerWidth - emojiBox.offsetWidth - margin;
+
+        emojiBox.style.top = Math.max(margin, Math.min(top, maxTop)) + "px";
+        emojiBox.style.left = Math.max(margin, Math.min(left, maxLeft)) + "px";
+    }
+}
+
+function closeEmojiBox() {
+    var emojiContainer = document.getElementById("emoji-box-container");
+    emojiContainer.style.display = "none";
+
+    var emojiEntryContainer = document.getElementById("emoji-entry-container");
+    var gifEntryContainer = document.getElementById("emoji-entry-container");
+    //emojiEntryContainer.innerHTML = "";
+
+    emojiEntryContainer.style.display = "flex";
+    gifEntryContainer.style.display = "none";
+
+    var emojiTab = document.getElementById("emoji-box-emojis");
+    var gifTab = document.getElementById("emoji-box-gifs");
+
+    try {
+        emojiTab.classList.add("SelectedTab");
+        gifTab.classList.remove("SelectedTab");
+    } catch (e) {
+        console.log(e)
+    }
+}
+
 function isOnlyText(html) {
     const temp = document.createElement("div");
     temp.innerHTML = html;
@@ -212,13 +260,17 @@ function emojiCodeToImg(str) {
             /\p{Regional_Indicator}{2}/u.test(segment) ||
             /\p{Emoji_Presentation}/u.test(segment);
 
+
         if (isEmoji) {
-            const file = Array.from(segment)
-                .map(c => c.codePointAt(0).toString(16).toLowerCase())
-                .join("-") + ".svg";
+            const code = Array.from(segment, c =>
+                c.codePointAt(0).toString(16).toLowerCase()
+            ).join("-");
+
+
+            const file = code + ".svg";
 
             const big = isOnlyText(str) ? "big" : "";
-            out += `<img src="/img/default_emojis/${file}" alt="${segment}" class="inline-text-emoji ${big} default">`;
+            out += `<img src="/img/default_emojis/${file}" alt="${segment}" data-code="${code}" class="inline-text-emoji ${big} default">`;
         } else {
             out += segment;
         }

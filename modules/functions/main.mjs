@@ -730,11 +730,6 @@ export function checkConfigAdditions() {
         Config changes from some update
     */
 
-    // tenor
-    checkObjectKeys(serverconfig, "serverinfo.tenor.enabled", false)
-    checkObjectKeys(serverconfig, "serverinfo.tenor.api_key", "")
-    checkObjectKeys(serverconfig, "serverinfo.tenor.limit", 100)
-
     // Added MySQL
     checkObjectKeys(serverconfig, "serverinfo.sql.enabled", false)
     checkObjectKeys(serverconfig, "serverinfo.sql.host", "localhost")
@@ -751,6 +746,7 @@ export function checkConfigAdditions() {
 
     // If the channel doesnt exist it will not display "member joined" messages etc
     checkObjectKeys(serverconfig, "serverinfo.defaultChannel", "0")
+    checkObjectKeys(serverconfig, "serverinfo.countryCode", "")
     // check for message load limit
     checkObjectKeys(serverconfig, "serverinfo.messageLoadLimit", 50)
 
@@ -1252,7 +1248,6 @@ export function anonymizeMember(member, shouldHide, isAdmin) {
 
 export function autoAnonymizeMember(issuerMemberId, member){
     if(!member?.id) member = getUnkownMember()
-    if(!issuerMemberId) throw new Error("Issuer id not supplied");
     let shouldAnonymize = member?.isBanned
 
     if(shouldAnonymize){
@@ -1264,21 +1259,20 @@ export function autoAnonymizeMember(issuerMemberId, member){
 
 export function autoAnonymizeMessage(issuerMemberId, message){
     if(!message?.author?.id) message.author = getUnkownMember()
-    if(!issuerMemberId) throw new Error("Issuer id not supplied");
 
     let author = serverconfig.servermembers[message.author.id] || getUnkownMember()
     if(!author) throw new Error("Message author member object not found");
 
     let shouldAnonymize = (author?.isBanned == true || message?.anon === true) || false
     if(shouldAnonymize){
-        return anonymizeMessage(message, author?.isBanned, hasPermission(issuerMemberId, "viewAnonymizedMessages"));
+        return anonymizeMessage(message, author?.isBanned, hasPermission(issuerMemberId, "viewAnonymizedMessages"), issuerMemberId);
     }
     else{
         return message;
     }
 }
 
-export function anonymizeMessage(message, hideContentForMembers = false, isAdmin = false) {
+export function anonymizeMessage(message, hideContentForMembers = false, isAdmin = false, issuerMemberId) {
     message = copyObject(message);
 
     if (!message || typeof message !== "object") {
@@ -1290,6 +1284,16 @@ export function anonymizeMessage(message, hideContentForMembers = false, isAdmin
 
     let originalAuthor = serverconfig.servermembers[message.author.id] || getUnkownMember();
     let isBanned = originalAuthor?.isBanned;
+
+    // anonymize message author
+    if(message?.author?.name){
+        message.author = autoAnonymizeMember(issuerMemberId, originalAuthor);
+    }
+
+    // anonymize message reply author
+    if(message?.reply?.author?.name){
+        message.reply.author = autoAnonymizeMember(issuerMemberId, serverconfig.servermembers[message.reply.author.id]);
+    }
 
     if(message?.id) delete message?.id;
     if(message?.author) {

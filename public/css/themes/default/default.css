@@ -50,8 +50,13 @@ a {
 
 .audio-player{
     /* multi color gradient !!!!! */
-    background: linear-gradient(90deg, hsl(from var(--main) h s calc(l * 2.25)), hsl(from var(--main) h s calc(l * 3)), hsl(from var(--main) h s calc(l * 2.75)) );
-    border: 2px solid  hsl(from var(--main) h s calc(l * 1.9))
+    background: linear-gradient(
+            110deg,
+            hsl(from var(--main) h calc(s * 5) calc(l * 3)),
+            hsl(from var(--main) h calc(s * 10) calc(l * 4)),
+            hsl(from var(--main) h calc(s * 5) calc(l * 3))
+    );
+    border: 2px solid  hsl(from var(--main) h s calc(l * 8) / 20%)
 }
 
 #content-container,
@@ -297,3 +302,14 @@ p.note{
     background-color: hsl(from var(--main) h s calc(l * 6) / 55%);
 }
 
+/* message reactions */
+.message-container .content .message-reaction-row .message-reaction-entry{
+    background-color: hsl(from var(--main) h s calc(l * 4) / 20%);
+    border: 2px solid hsl(from var(--main) h s calc(l * 8) / 20%);
+    color: hsl(from var(--main) h s calc(l * 8) / 80%);
+}
+.message-container .content .message-reaction-row .message-reaction-entry.reacted{
+    background-color: hsl(from var(--main) h calc(s * 20) calc(l * 4) / 20%);
+    border: 2px solid hsl(from var(--main) h calc(s * 20) calc(l * 8) / 20%);
+    color: hsl(from var(--main) h calc(s * 20) calc(l * 8) / 80%);
+}

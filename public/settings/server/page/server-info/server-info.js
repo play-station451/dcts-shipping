@@ -75,6 +75,22 @@ function displayServerInfoSettings(response){
 
     mainSettings.insertAdjacentElement("beforeend",
         JsonEditor.getSettingElement(
+            response.serverinfo.countryCode,
+            "Community Country Code",
+            "Alpha-2 Code of your community, like US, DE, GB, FR, ...",
+            v => {
+                response.serverinfo.countryCode = v;
+                if (checkJsonChanges(response, originalnfo)) {
+                    showSaveSettings(async () => {
+                        saveServerInfoSettings(response);
+                    })
+                }
+            }
+        )
+    );
+
+    mainSettings.insertAdjacentElement("beforeend",
+        JsonEditor.getSettingElement(
             response.serverinfo.discovery.enabled,
             "Enable Discovery",
             "If other servers can discover your server or not.",

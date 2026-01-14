@@ -201,6 +201,12 @@ async function renderServersList(servers) {
 
         console.log(externalServerData)
 
+        // cache or some shit
+        if(!externalServerData?.serverinfo?.voip && externalServerData?.serverinfo?.turn) {
+            externalServerData.serverinfo.voip = externalServerData.serverinfo.turn
+        }
+
+
         card.className = "server-card";
         card.style.setProperty("--reveal-delay", `${idx * 200}ms`);
         card.innerHTML = `

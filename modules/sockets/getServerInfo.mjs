@@ -20,6 +20,7 @@ export async function getPublicServerInfoObject(){
         serverinfo: {
             name: serverconfig.serverinfo.name,
             description: serverconfig.serverinfo.description,
+            countryCode: serverconfig.serverinfo.countryCode,
             about: serverconfig.serverinfo.home.about || null,
             banner: serverconfig.serverinfo.home.banner_url || null,
             icon: group?.info?.icon || null,
@@ -84,6 +85,7 @@ export default (io) => (socket) => {
             if (hasPermission(member.id, "manageServer")) {
                 if(member?.serverinfo?.name != null) serverconfig.serverinfo.name = member.serverinfo.name;
                 if(member?.serverinfo?.description != null) serverconfig.serverinfo.description = member.serverinfo.description;
+                if(member?.serverinfo?.countryCode != null) serverconfig.serverinfo.countryCode = member.serverinfo.countryCode;
 
                 if(member?.serverinfo?.uploadFileTypes != null) serverconfig.serverinfo.uploadFileTypes = member.serverinfo.uploadFileTypes;
                 if(member?.serverinfo?.defaultChannel != null) serverconfig.serverinfo.defaultChannel = member.serverinfo.defaultChannel;

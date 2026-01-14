@@ -28,7 +28,13 @@ import {getMentionIdsFromText} from "../sockets/messageSend.mjs";
 import {getJson, hasPermission, shouldIgnoreMember} from "./chat/main.mjs";
 import {copyObject, generateId, getCastingMemberObject} from "./main.mjs";
 import {resolveMemberRoles} from "../sockets/resolveMemberRoles.mjs";
-import {decodeAndParseJSON, getMessageObjectById} from "../sockets/resolveMessage.mjs";
+import {
+    checkMessageObjAuthor,
+    checkMessageObjReactions,
+    decodeAndParseJSON,
+    getMessageObjectById
+} from "../sockets/resolveMessage.mjs";
+import {getMessageReactionsById} from "../sockets/messageReactions.mjs";
 
 var serverconfigEditable = serverconfig;
 
@@ -243,6 +249,8 @@ export async function getSavedChatMessage(group, category, channel, index = -1) 
                     message.reply = messageObjResult?.message;
                 }
 
+                message = checkMessageObjAuthor(message);
+                message = await checkMessageObjReactions(message);
 
                 sortedMessages.push(message)
             }

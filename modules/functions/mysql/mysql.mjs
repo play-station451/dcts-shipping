@@ -38,7 +38,6 @@ export async function checkAndCreateTable(table) {
 
         if (tableExists) {
             await checkAndCreateColumns(table);
-            await syncColumns(table);
         } else {
             await createTable(table);
         }
@@ -97,80 +96,6 @@ async function createTable(table) {
         Logger.error('Error in createTable:', err);
     }
 }
-
-async function syncColumns(table) {
-    const query = `
-        SELECT COLUMN_NAME, IS_NULLABLE, COLUMN_TYPE, COLUMN_DEFAULT
-        FROM information_schema.columns
-        WHERE table_schema = ?
-          AND table_name = ?
-    `;
-
-    const results = await queryDatabase(query, [
-        serverconfig.serverinfo.sql.database,
-        table.name
-    ]);
-
-    const dbColumns = Object.fromEntries(
-        results.map(r => [r.COLUMN_NAME, r])
-    );
-
-    for (const col of table.columns) {
-        const dbCol = dbColumns[col.name];
-
-        if (!dbCol) {
-            await addMissingColumns(table.name, [col]);
-            continue;
-        }
-
-        const desired = parseColumn(col.type);
-        const current = {
-            type: dbCol.COLUMN_TYPE.toLowerCase(),
-            nullable: dbCol.IS_NULLABLE === "YES",
-            default: dbCol.COLUMN_DEFAULT
-        };
-
-        if (
-            desired.type !== current.type ||
-            desired.nullable !== current.nullable ||
-            desired.default !== current.default
-        ) {
-            await modifyColumn(table.name, col);
-        }
-    }
-}
-
-function parseColumn(type) {
-    const t = type.toLowerCase();
-
-    return {
-        type: t
-            .replace(/ not null/g, "")
-            .replace(/ null/g, "")
-            .replace(/ default .+$/, "")
-            .trim(),
-        nullable: !t.includes("not null"),
-        default: (() => {
-            const m = t.match(/default\s+(.+)$/);
-            if (!m) return null;
-            const v = m[1].trim();
-            if (v.toUpperCase() === "NULL") return null;
-            return v.replace(/^'|'$/g, "");
-        })()
-    };
-}
-
-async function modifyColumn(tableName, col) {
-    let type = col.type.replace(/primary key/gi, "").trim();
-
-    const query = mysql.format(
-        `ALTER TABLE ?? MODIFY COLUMN ${col.name} ${type}`,
-        [tableName]
-    );
-
-    await queryDatabase(query);
-}
-
 
 async function addMissingColumns(tableName, columns) {
     const alter = columns

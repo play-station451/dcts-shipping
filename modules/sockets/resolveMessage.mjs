@@ -2,13 +2,14 @@ import { serverconfig, xssFilters } from "../../index.mjs";
 import { hasPermission } from "../functions/chat/main.mjs";
 import Logger from "../functions/logger.mjs";
 import {
-    anonymizeMessage,
+    anonymizeMessage, autoAnonymizeMember,
     autoAnonymizeMessage,
     copyObject, getCastingMemberObject,
     sendMessageToUser,
     validateMemberId
 } from "../functions/main.mjs";
 import {decodeFromBase64, getChatMessageById} from "../functions/mysql/helper.mjs";
+import {getMessageReactionsById} from "./messageReactions.mjs";
 
 export function decodeString(string){
     try{
@@ -30,6 +31,36 @@ export function decodeAndParseJSON(data){
     return data;
 }
 
+export async function checkMessageObjReactions(message){
+    if(!message.messageId) throw new Error("Message id was not provided");
+
+    if (!message.reactions || Object.keys(message.reactions).length === 0) {
+        const rows = await getMessageReactionsById(message.messageId);
+        message.reactions = {};
+
+        // no reactions found so we return lol
+        if(!rows) return message;
+
+        for (const { emojiHash, memberId } of rows) {
+            if (!message.reactions[emojiHash]) {
+                message.reactions[emojiHash] = [];
+            }
+            message.reactions[emojiHash].push(memberId);
+        }
+    }
+
+    return message
+}
+
+export function checkMessageObjAuthor(message){
+    if(!message?.author?.name){
+        message.author = getCastingMemberObject(serverconfig.servermembers[message.author.id]);
+    }
+
+    return message;
+}
+
+
 export async function getMessageObjectById(messageId){
     if(!messageId){
         return { error: "Message id was not provided", message: null}
@@ -41,17 +72,13 @@ export async function getMessageObjectById(messageId){
         return { error: "Message not found", message: null}
     }
 
-    const message = decodeAndParseJSON(messageRow.message);
+    let message = decodeAndParseJSON(messageRow.message);
 
     if(message?.id) delete message.id;
     if(message?.color) delete message.color;
 
-    if(!message?.author?.name){
-        message.author = getCastingMemberObject(
-            serverconfig.servermembers[message.author.id]
-        );
-    }
-
+    message = checkMessageObjAuthor(message);
+    message = await checkMessageObjReactions(message);
     return { error: null, message };
 }
 

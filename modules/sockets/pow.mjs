@@ -1,6 +1,6 @@
 import { crypto, saveConfig, serverconfig, useridFromSocket, xssFilters } from "../../index.mjs";
 import { formatDateTime, getJson } from "../functions/chat/main.mjs";
-import Logger from "../functions/logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 import { checkConnectionLimit, checkMemberBan, checkRateLimit, copyObject, removeFromArray, validateMemberId } from "../functions/main.mjs";
 import { estimatePoWDuration, formatTimeDifference } from "../functions/pow.mjs";
 

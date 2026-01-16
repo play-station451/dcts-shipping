@@ -118,11 +118,11 @@ async function initIpSettings(){
 
         ipSettings.insertAdjacentElement("beforeend",
             JsonEditor.getSettingElement(
-                ipData.ip.blockSatellite,
-                "Block Sattelites",
+                ipData.ip.blockSatelite,
+                "Block Satelites",
                 null,
                 v => {
-                    ipData.ip.blockSatellite = v;
+                    ipData.ip.blockSatelite = v;
                     if(checkJsonChanges(ipData, originalIpData)){
                         showSaveSettings( async () => {
                             await saveIpSettings(ipData);
@@ -164,6 +164,7 @@ async function initIpSettings(){
             )
         );
 
+        // some lists
         ipSettings.insertAdjacentElement("beforeend",
             JsonEditor.getSettingElement(
                 ipData.ip.blockedCountryCodes,
@@ -171,6 +172,70 @@ async function initIpSettings(){
                 "You can block entire countries by adding their Alpha-2 Code, like Germany -> DE, USA -> US, ....",
                 v => {
                     ipData.ip.blockedCountryCodes = v;
+                    if(checkJsonChanges(ipData, originalIpData)){
+                        showSaveSettings( async () => {
+                            await saveIpSettings(ipData);
+                        })
+                    }
+                }
+            )
+        );
+
+        ipSettings.insertAdjacentElement("beforeend",
+            JsonEditor.getSettingElement(
+                ipData.ip.urlWhitelist,
+                "URL Whitelist",
+                "Allow specific urls to bypass filters. Supports regex.",
+                v => {
+                    ipData.ip.urlWhitelist = v;
+                    if(checkJsonChanges(ipData, originalIpData)){
+                        showSaveSettings( async () => {
+                            await saveIpSettings(ipData);
+                        })
+                    }
+                }
+            )
+        );
+
+        ipSettings.insertAdjacentElement("beforeend",
+            JsonEditor.getSettingElement(
+                ipData.ip.companyDomainWhitelist,
+                "Company Domain Whitelist",
+                "Allows specific company domains to bypass restrictions, like cloudflare.",
+                v => {
+                    ipData.ip.companyDomainWhitelist = v;
+                    if(checkJsonChanges(ipData, originalIpData)){
+                        showSaveSettings( async () => {
+                            await saveIpSettings(ipData);
+                        })
+                    }
+                }
+            )
+        );
+
+        ipSettings.insertAdjacentElement("beforeend",
+            JsonEditor.getSettingElement(
+                ipData.ip.whitelist,
+                "IP Whitelist",
+                "Allow IPs to bypass restrictions",
+                v => {
+                    ipData.ip.whitelist = v;
+                    if(checkJsonChanges(ipData, originalIpData)){
+                        showSaveSettings( async () => {
+                            await saveIpSettings(ipData);
+                        })
+                    }
+                }
+            )
+        );
+
+        ipSettings.insertAdjacentElement("beforeend",
+            JsonEditor.getSettingElement(
+                ipData.ip.blacklist,
+                "IP Blacklist",
+                "Block IPs",
+                v => {
+                    ipData.ip.blacklist = v;
                     if(checkJsonChanges(ipData, originalIpData)){
                         showSaveSettings( async () => {
                             await saveIpSettings(ipData);

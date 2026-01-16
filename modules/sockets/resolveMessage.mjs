@@ -1,6 +1,5 @@
 import { serverconfig, xssFilters } from "../../index.mjs";
 import { hasPermission } from "../functions/chat/main.mjs";
-import Logger from "../functions/logger.mjs";
 import {
     anonymizeMessage, autoAnonymizeMember,
     autoAnonymizeMessage,

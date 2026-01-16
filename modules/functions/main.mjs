@@ -14,7 +14,7 @@ import {
     usersocket,
     sanitizeHtml,
     bcrypt,
-    fs, signer, pool
+    fs, signer, db
 } from "../../index.mjs"
 import {
     banIp,
@@ -26,13 +26,11 @@ import {
     resolveRolesByUserId
 } from "./chat/main.mjs";
 import {consolas} from "./io.mjs";
-import Logger from "./logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 import path from "path";
 import {powVerifiedUsers} from "../sockets/pow.mjs";
 import {sendSystemMessage} from "../sockets/home/general.mjs";
 import {decodeFromBase64, encodeToBase64, exportDatabaseFromPool} from "./mysql/helper.mjs";
-import {exec, spawn} from "node:child_process";
-import {queryDatabase} from "./mysql/mysql.mjs";
 import {checkMemberMigration} from "./migrations/memberJsonToDb.mjs";
 import {clearBase64FromDatabase} from "./migrations/base64_fixer.mjs";
 import {getMemberHighestRole} from "./chat/helper.mjs";
@@ -177,7 +175,7 @@ export function sanitizeFilename(filename) {
 }
 
 export async function backupSystem() {
-    const dirName = sanitizeFilename(new Date().toISOString());
+    const dirName = sanitizeFilename(`v${versionCode}_${new Date().toISOString()}`);
     const baseDir = `./backups/${dirName}`;
     const zipPath = `${baseDir}.zip`;
 
@@ -185,7 +183,7 @@ export async function backupSystem() {
     fs.cpSync("./configs/", `${baseDir}/configs`, { recursive: true });
 
     await exportDatabaseFromPool(
-        pool,
+        db.pool,
         `${baseDir}/${serverconfig.serverinfo.sql.database}.sql`
     );
 
@@ -612,10 +610,18 @@ export function checkBool(value, type) {
 export function checkConfigAdditions() {
 
     // new cool ip block shit
+    checkObjectKeys(serverconfig, "serverinfo.moderation.ip.urlWhitelist",
+        [
+            /^\/discover(\/.*)?$/,
+            /^\/uploads(\/.*)?$/
+        ]
+    )
+    checkObjectKeys(serverconfig, "serverinfo.moderation.ip.companyDomainWhitelist", [])
+    checkObjectKeys(serverconfig, "serverinfo.moderation.ip.blacklist", [])
     checkObjectKeys(serverconfig, "serverinfo.moderation.ip.whitelist", [])
     checkObjectKeys(serverconfig, "serverinfo.moderation.ip.blockedCountryCodes", [])
     checkObjectKeys(serverconfig, "serverinfo.moderation.ip.blockDataCenter", true)
-    checkObjectKeys(serverconfig, "serverinfo.moderation.ip.blockSatellite", true)
+    checkObjectKeys(serverconfig, "serverinfo.moderation.ip.blockSatelite", true)
     checkObjectKeys(serverconfig, "serverinfo.moderation.ip.blockCrawler", true)
     checkObjectKeys(serverconfig, "serverinfo.moderation.ip.blockBogon", true)
     checkObjectKeys(serverconfig, "serverinfo.moderation.ip.blockProxy", true)

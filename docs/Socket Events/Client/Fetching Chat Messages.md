@@ -67,7 +67,8 @@ socket.emit("getChatlog", {
             "replyMsgId": null,
             "timestamp": 1766547310370,
             "messageId": "110190787053",
-            "reply": {}
+            "reply": {},
+            reactions: {}
         },
         {
             "author": {
@@ -99,7 +100,8 @@ socket.emit("getChatlog", {
             "messageId": "167498043669",
             "reply": {
                 "messageId": null
-            }
+            },
+            reactions: {}
         }
 }
 ```

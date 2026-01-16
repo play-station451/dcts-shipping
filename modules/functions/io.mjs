@@ -14,7 +14,7 @@ import {
     allowLogging,
     configPath
 } from "../../index.mjs"
-import Logger from "./logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 import {
     saveChatMessageInDb,
     getChatMessagesFromDb,
@@ -27,14 +27,12 @@ import {
 import {getMentionIdsFromText} from "../sockets/messageSend.mjs";
 import {getJson, hasPermission, shouldIgnoreMember} from "./chat/main.mjs";
 import {copyObject, generateId, getCastingMemberObject} from "./main.mjs";
-import {resolveMemberRoles} from "../sockets/resolveMemberRoles.mjs";
 import {
     checkMessageObjAuthor,
     checkMessageObjReactions,
     decodeAndParseJSON,
     getMessageObjectById
 } from "../sockets/resolveMessage.mjs";
-import {getMessageReactionsById} from "../sockets/messageReactions.mjs";
 
 var serverconfigEditable = serverconfig;
 

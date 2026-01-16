@@ -1,5 +1,5 @@
 import {queryDatabase} from "../mysql/mysql.mjs";
-import Logger from "../logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 import {decodeAndParseJSON} from "../../sockets/resolveMessage.mjs";
 import {copyObject} from "../main.mjs";
 

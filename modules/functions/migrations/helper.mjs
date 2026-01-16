@@ -2,7 +2,8 @@ import {queryDatabase} from "../mysql/mysql.mjs";
 import {backupSystem} from "../main.mjs";
 import {migrateOldMessagesToNewMessageSystemWithoutEncoding} from "./messageMigration.mjs";
 import {clearMemberBase64FromDb} from "./base64_fixer.mjs";
-import Logger from "../logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
+import {versionCode} from "../../../index.mjs";
 
 export async function createMigrationTask(name){
     return await queryDatabase("INSERT IGNORE INTO migrations (migration_name) VALUES (?)", [name])
@@ -27,8 +28,16 @@ export async function getMigrationTask(name, createIfNull = false){
 export async function checkMigrations(){
     let didBackup = false;
 
+    // auto backup on server update
+    let migrationTask = await getMigrationTask(`update_${versionCode}`, true);
+    if(migrationTask && migrationTask?.done === 0){
+        await doBackup()
+        await completeMigrationTask(`update_${versionCode}`)
+        didBackup = false; // intentionally make a new backup after updates and migration
+    }
+
     // new message system migration
-    let migrationTask = await getMigrationTask("migrateNewMessages", true);
+    migrationTask = await getMigrationTask("migrateNewMessages", true);
     if(migrationTask && migrationTask?.done === 0){
         await doBackup()
         await migrateOldMessagesToNewMessageSystemWithoutEncoding()

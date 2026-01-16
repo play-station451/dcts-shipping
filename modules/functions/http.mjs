@@ -1,8 +1,7 @@
 import {server, serverconfig, http, https, app, setServer, fs, saveConfig} from "../../index.mjs";
-import Logger from "./logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 import {lookupIP} from "./chat/main.mjs";
 
-var serverconfigEditable = serverconfig;
 
 function getClientIp(req) {
     const xf = req.headers["x-forwarded-for"];
@@ -13,6 +12,9 @@ function getClientIp(req) {
 
 
 export function checkIP(){
+    Logger.error("DEPRECATED IP CHECK")
+    process.exit(0);
+    
     app.use(async (req, res, next) => {
         const ipInfo = await lookupIP(getClientIp(req));
         if (!ipInfo) return next();

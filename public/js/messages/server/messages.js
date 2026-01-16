@@ -792,11 +792,6 @@ async function createMsgHTML({
     let isBanned = message?.author?.isBanned;
     let messageReactionsRow = await getMessageReactionsHTML(message);
 
-    if(message.messageId === "160938858501") {
-        console.log(message);
-        console.log(messageReactionsRow);
-    }
-
     let messageRow =
         `
         <div class="content ${isSystem ? "system" : ""} ${waitWithDisplay ? "waitForDisplay" : ""}"  

@@ -2,7 +2,6 @@
     The functions here are basically the "core" of the chat app on the server side.
  */
 import {serverconfig, xssFilters, colors, saveConfig, usersocket, server} from "../../../index.mjs"
-import {consolas} from "../io.mjs";
 import {io} from "../../../index.mjs";
 import {getMemberHighestRole} from "./helper.mjs";
 import {
@@ -15,7 +14,7 @@ import {
 } from "../main.mjs";
 import {encodeToBase64} from "../mysql/helper.mjs";
 import {signer} from "../../../index.mjs"
-import Logger from "../logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 import {queryDatabase} from "../mysql/mysql.mjs";
 
 var serverconfigEditable = serverconfig;

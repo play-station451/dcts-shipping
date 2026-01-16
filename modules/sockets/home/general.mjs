@@ -1,6 +1,6 @@
 import {io, serverconfig, signer, usersocket, xssFilters} from "../../../index.mjs";
 import { hasPermission } from "../../functions/chat/main.mjs";
-import Logger from "../../functions/logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 import { copyObject, emitBasedOnPermission, getCastingMemberObject, sanitizeInput, sendMessageToUser, validateMemberId } from "../../functions/main.mjs";
 import { decodeFromBase64, encodeToBase64 } from "../../functions/mysql/helper.mjs";
 import { queryDatabase } from "../../functions/mysql/mysql.mjs";

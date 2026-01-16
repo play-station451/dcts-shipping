@@ -2,7 +2,7 @@ import { copyObject, sendMessageToUser, validateMemberId } from "../functions/ma
 import {getMessageObjectById} from "./resolveMessage.mjs";
 import {queryDatabase} from "../functions/mysql/mysql.mjs";
 import xssFilters from "xss-filters";
-import Logger from "../functions/logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 
 export async function getMessageReactionsById(messageId){
     if(!messageId){

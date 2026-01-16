@@ -10,6 +10,7 @@ The message object will consists of a few key components: **Message**, **Member*
 - `timestamp` is set by the server
 - `messageId` is set by the server as well.
 - `reply` is also set by the server
+- `reactions` is set by the server as well and include message emoji reactions
 
 ```json
 {
@@ -27,7 +28,8 @@ The message object will consists of a few key components: **Message**, **Member*
     "messageId": "174363723585",
     "reply": {
         messageId: null,
-    }
+    },
+    "reactions": {}
 }
 ```
 
@@ -78,8 +80,46 @@ The message object will automatically include the message author's info.
     "timestamp": 1766556639785,
     "messageId": "169812525145",
     "reply": {
-        "messageId": ,
+        "messageId": null,
     }
+    ,
+    "reactions": {}
+}
+```
+
+------
+
+### Reaction Object
+
+The `reactions` object will store all reactions a message has and will be made of several keys as array being based of the emoji hash and the member ids of who reacted to it.
+
+- `94222e03429a03c44b5c5d7de644ef3fad5083f41c8cad2bd3f507852d55365b`: The emoji hash/emoji used to react to the message
+- `114755069684`: One example member id of who used the emoji with the has above to react to this message.
+
+Each array for a specific reaction can have multiple entries for the different members that reacted with the same emoji.
+
+```json
+{
+    "author": {
+        "id": "114755069684",
+    },
+    "room": "0-0-1356",
+    "message": "<p>test reply</p>",
+    "group": "0",
+    "category": "0",
+    "channel": "1356",
+    "editedMsgId": null,
+    "replyMsgId": "140914346248",
+    "timestamp": 1766556639785,
+    "messageId": "169812525145",
+    "reply": {
+        "messageId": null,
+    },
+    "reactions": {
+        "94222e03429a03c44b5c5d7de644ef3fad5083f41c8cad2bd3f507852d55365b": [
+            "114755069684"
+        ]
+    },
 }
 ```
 
@@ -138,7 +178,8 @@ When replying to a message, the `reply` object will include the object of the me
         "reply": {
             "messageId": null
         }
-    }
+    },
+    "reactions": {}
 }
 ```
 
@@ -208,7 +249,12 @@ The following object is the complete JSON object of a message thats replying to 
         "reply": {
             "messageId": null
         }
-    }
+    },
+    "reactions": {
+        "94222e03429a03c44b5c5d7de644ef3fad5083f41c8cad2bd3f507852d55365b": [
+            "114755069684"
+        ]
+    },
 }
 ```
 

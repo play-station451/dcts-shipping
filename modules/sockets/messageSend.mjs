@@ -1,7 +1,7 @@
 import {serverconfig, typingMembers, usersocket, xssFilters} from "../../index.mjs";
 import {formatDateTime, hasPermission} from "../functions/chat/main.mjs";
 import {saveChatMessage} from "../functions/io.mjs";
-import Logger from "../functions/logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 import {
     checkMemberMute,
     checkRateLimit,

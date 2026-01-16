@@ -1,6 +1,6 @@
 import {queryDatabase} from "./mysql.mjs";
 import {XMLHttpRequest, fetch, serverconfig} from "../../../index.mjs";
-import Logger from "../logger.mjs";
+import Logger from "@hackthedev/terminal-logger"
 import fs from "fs";
 import {spawn} from "node:child_process";
 

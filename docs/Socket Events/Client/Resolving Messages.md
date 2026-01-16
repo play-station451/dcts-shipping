@@ -67,6 +67,11 @@ As in this document's example, this is what the response will return if successf
     "replyMsgId": "196493263721",
     "timestamp": 1766881632881,
     "messageId": "134161700965",
+    "reactions": {
+        "94222e03429a03c44b5c5d7de644ef3fad5083f41c8cad2bd3f507852d55365b": [
+            "114755069684"
+        ]
+    },
     "reply": {
         "author": {
             "id": "114755069684",

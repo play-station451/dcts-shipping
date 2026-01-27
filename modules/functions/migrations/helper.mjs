@@ -59,7 +59,6 @@ export async function checkMigrations(){
         Logger.space()
         Logger.warn("Message logs have been rebuilt. Please start the server one more time")
         Logger.space();
-        process.exit(0);
     }
 
     async function doBackup(){

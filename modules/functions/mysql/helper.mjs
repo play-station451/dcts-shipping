@@ -28,6 +28,7 @@ export async function saveMemberToDB(id, data) {
 }
 
 export async function exportDatabaseFromPool(pool, outFile) {
+    return;
     let host = process.env.DB_HOST || serverconfig.serverinfo.sql.host;
     let user = process.env.DB_USER || serverconfig.serverinfo.sql.username;
     let password = process.env.DB_PASS || serverconfig.serverinfo.sql.password;

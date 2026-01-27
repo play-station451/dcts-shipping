@@ -182,10 +182,10 @@ export async function backupSystem() {
     if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true });
     fs.cpSync("./configs/", `${baseDir}/configs`, { recursive: true });
 
-    await exportDatabaseFromPool(
-        db.pool,
-        `${baseDir}/${serverconfig.serverinfo.sql.database}.sql`
-    );
+    //await exportDatabaseFromPool(
+    //    db.pool,
+    //    `${baseDir}/${serverconfig.serverinfo.sql.database}.sql`
+    //);
 
     await new Promise((resolve, reject) => {
         const output = fs.createWriteStream(zipPath);

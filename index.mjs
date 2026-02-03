@@ -171,8 +171,19 @@ if (fs.existsSync("./configs/sql.txt")) {
     if (serverconfig.serverinfo.sql.database !== dbName)
         serverconfig.serverinfo.sql.database = dbName;
     serverconfig.serverinfo.sql.enabled = true; // enabled it because the file doesnt exist for fun
-    saveConfig(serverconfig);
 }
+
+// overwrites for docker
+if (process.env.DB_HOST) serverconfig.serverinfo.sql.host = process.env.DB_HOST;
+if (process.env.DB_USER)
+    serverconfig.serverinfo.sql.username = process.env.DB_USER;
+if (process.env.DB_PASS)
+    serverconfig.serverinfo.sql.password = process.env.DB_PASS;
+if (process.env.DB_NAME)
+    serverconfig.serverinfo.sql.database = process.env.DB_NAME;
+serverconfig.serverinfo.sql.enabled = true;
+await saveConfig(serverconfig);
+
 
 // create sql pool
 export let db = new dSyncSql({
@@ -184,18 +195,6 @@ export let db = new dSyncSql({
     connectionLimit: serverconfig.serverinfo.sql.connectionLimit,
     queueLimit: 0,
 });
-
-// overwrites for docker
-if (process.env.DB_HOST) serverconfig.serverinfo.sql.host = process.env.DB_HOST;
-if (process.env.DB_USER)
-    serverconfig.serverinfo.sql.username = process.env.DB_USER;
-if (process.env.DB_PASS)
-    serverconfig.serverinfo.sql.password = process.env.DB_PASS;
-if (process.env.DB_NAME)
-    serverconfig.serverinfo.sql.database = process.env.DB_NAME;
-serverconfig.serverinfo.sql.enabled = true;
-saveConfig(serverconfig);
-
 
 Logger.info("Checking and waiting for database connection...");
 Logger.info("If it takes too long check the data inside the config.json file");

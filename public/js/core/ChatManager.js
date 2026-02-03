@@ -18,7 +18,115 @@ class ChatManager {
         return `<img src="/img/default_emojis/${codepoints.toLowerCase()}.svg" title="${code?.toUpperCase()}" class="inline-text-emoji">`;
     }
 
+    static async showThemePage(){
+        let themesRes = await fetch("/themes/list");
+        let themes;
+        if(themesRes.status === 200){
+            let responseJson = await themesRes.json();
+            themes = responseJson?.themes
+        }
 
+        if(!themes) return console.warn("No themes found")
+
+        PageRenderer.renderHTML(document.body,
+            `
+                <style>
+                .theme-page{
+                    display: flex;
+                    flex-direction: column;
+                    gap: 20px;
+                    
+                    width: 100%;
+                    max-height: 100%;
+                    margin: 20px auto;
+                    
+                    justify-content: center;
+                    align-items: center;
+                }
+                
+                .theme-page .theme-entries{
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: center;
+                    
+                    gap: 40px;
+                    flex-shrink: 0;
+                    flex-wrap: wrap;
+                }
+                                
+                .theme-page .theme-entry {
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                    overflow: hidden;
+                    cursor: pointer;
+                    border-radius: 10px;
+                    
+                    background-color: hsl(from var(--main) h s calc(l * 3));
+                    border: 2px solid hsl(from var(--main) h s calc(l * 3) / 20%);
+                }
+                .theme-page .theme-entry .thumbnail-container{
+                    overflow: hidden;
+                    width: 300px;
+                    height: 150px;
+                    background-color: black;
+                }
+                .theme-page .theme-entry p{
+                    margin: 10px auto;
+                }
+                .theme-page .theme-entry img{
+                    width: 300px;
+                    height: 150px;                    
+                    
+                    object-fit: cover;
+                    background-position: center center;
+                    transition: all 200ms ease-in-out;
+                    overflow: hidden;
+                }
+                
+                .theme-page .theme-entry:hover  {
+                    background-color: hsl(from var(--main) h s calc(l * 12) / 100%);
+                    color: hsl(from var(--main) h s calc(l * 0.5) / 100%);
+                    font-weight: bold;
+                }
+                .theme-page .theme-entry:hover img {
+                    transform: scale(1.1);
+                }
+                </style>
+
+                <div class="theme-page">
+                    <h1>Available Themes</h1>
+                    
+                    <div class="theme-entries">
+                        ${buildThemeEntryBodyHTML(themes)}
+                    </div>
+                </div>`
+        )
+
+        function buildThemeEntryBodyHTML(themes){
+            let code = "";
+
+            if(themes.length > 0){
+                for(let theme of themes){
+                    code += getThemeEntryHTML(theme)
+                }
+            }
+
+            return code;
+        }
+
+        function getThemeEntryHTML(theme){
+            return `
+                <div class="theme-entry">
+                    <div class="thumbnail-container">
+                        <img src="https://raw.githubusercontent.com/DCTS-Project/themes/refs/heads/main/theme/${theme}/thumbnail.png">
+                    </div>
+                    <p>${theme}</p>
+                </div>
+            
+            `
+        }
+    }
 
     static applyThemeOnLoad(theme, accent) {
         if (!theme) return;

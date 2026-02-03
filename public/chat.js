@@ -29,6 +29,7 @@ var allowEditorBlur
 document.addEventListener("DOMContentLoaded", async function () {
     ChatManager.applyThemeOnLoad(UserManager.getTheme(), UserManager.getThemeAccent());
     Docs.registerContextMenu()
+    //ChatManager.showThemePage();
 
     registerMessageInfiniteLoad(document.getElementById("content"))
     registerMessageCreateEvent();
@@ -689,8 +690,6 @@ function getMemberProfile(id, x, y, event = null, bypassEventCheck = false) {
         y = event.clientY;
     }
 
-    console.log(x, y)
-
     //console.log("Requesting profile")
     socket.emit("getMemberProfile", {
         id: UserManager.getID(),
@@ -1284,8 +1283,6 @@ async function sendMessageToServer(authorId, authorUsername, pfp, message, bypas
     if (bypassQuill === false) message = quill.root.innerHTML
     //if(quill.root.innerText.trim().length !== 0) message = quill.root.innerHTML;
 
-    console.log(message);
-
     let msgPayload = {
         author: {
             id: UserManager.getID(),
@@ -1674,7 +1671,6 @@ socket.on('receiveGifImage', function (response) {
 
     if (response?.gifs) {
         for (let gif of response.gifs) {
-            console.log(gif)
             document.getElementById("gif-entry-container").insertAdjacentHTML("beforeend", `<img
                     onclick="sendGif('${gif.media_formats.gif.url}')" src="${ChatManager.proxyUrl(gif.media_formats.nanogif.url)}"
                     style="padding: 1%;border-radius: 20px;float: left;width: 48%; height: fit-content;">`);
@@ -1694,9 +1690,6 @@ socket.on('receiveToken', function (data) {
 });
 
 socket.on('modalMessage', function (data) {
-
-    console.log(data)
-
     var buttonArray = [];
     if (data.buttons) {
         Object.keys(data.buttons).forEach(function (button) {
@@ -1931,12 +1924,9 @@ async function getEmojis(callback = null) {
                 title: response.msg || "", text: "", icon: response.type, img: null, type: response.type, duration: 1000
             });
         }
-
-        console.log(response);
     });
 
     function registerEmojiCallback(element, emojiObj){
-        console.log("Registered callback")
         element.addEventListener("click", async () => {
             if(!callback){
                 insertEmoji(emojiObj, true);

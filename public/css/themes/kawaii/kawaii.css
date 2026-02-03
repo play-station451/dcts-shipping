@@ -58,3 +58,6 @@ body::before {
     border: 1px solid rgba(128, 128, 128, 0.2);
 }
 
+.page-renderer{
+    background-color: hsl(from var(--main) h s calc(l * 1) / 100%) !important;
+}

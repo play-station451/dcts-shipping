@@ -5,7 +5,7 @@ class PageRenderer {
     static #allowGrow = false;
 
     static Element(){
-        return this.#page;
+        return this.#page
     }
 
     static async renderHTML(container, html, allowGrow = false) {

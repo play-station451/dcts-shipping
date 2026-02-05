@@ -32,7 +32,6 @@ export async function getPublicServerInfoObject(){
             defaultChannel: serverconfig.serverinfo.defaultChannel,
             uploadFileTypes: serverconfig.serverinfo.uploadFileTypes,
             messageLoadLimit: serverconfig.serverinfo.messageLoadLimit,
-            tenorEnabled: serverconfig.serverinfo.tenor.enabled,
             voip: serverconfig.serverinfo.livekit.enabled,
             sqlEnabled: serverconfig.serverinfo.sql.enabled,
             registration: serverconfig.serverinfo.registration.enabled,

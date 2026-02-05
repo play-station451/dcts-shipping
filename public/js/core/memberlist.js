@@ -87,6 +87,7 @@ function getMemberList() {
 
 
             reorderList(members);
+            cleanupEmptyRoles();
         }
 
         Clock.stop("memberlist_build")
@@ -102,23 +103,28 @@ function getMemberList() {
             const frag = document.createDocumentFragment();
 
             let roles = Array.from(element.querySelectorAll(".infolist-role"))
-                .sort((a, b) => Number(b.getAttribute("data-sort-id")) - Number(a.getAttribute("data-sort-id")));
+                .sort((a, b) =>
+                    Number(b.getAttribute("data-sort-id")) -
+                    Number(a.getAttribute("data-sort-id"))
+                );
 
             roles.forEach(role => frag.appendChild(role));
             element.appendChild(frag);
 
-            let memberNodes = element.querySelectorAll(".memberlist-container");
-            if (memberNodes.length === Object.keys(members).length) return;
-
-            memberNodes.forEach(member => {
-                let memberId = member.getAttribute("data-member-id")
-                if (!members[memberId]) {
-                    let roleContainer = member.closest(".infolist-role");
+            element.querySelectorAll(".memberlist-container").forEach(member => {
+                let memberId = member.getAttribute("data-member-id");
+                if(!members[memberId]){
                     member.remove();
+                }
+            });
+        });
+    }
 
-                    if (roleContainer.querySelectorAll(".memberlist-container").length === 0) {
-                        roleContainer.remove();
-                    }
+    function cleanupEmptyRoles(){
+        getRenderElements().forEach(element => {
+            element.querySelectorAll(".infolist-role").forEach(role => {
+                if(role.querySelectorAll(".memberlist-container").length === 0){
+                    role.remove();
                 }
             });
         });
@@ -129,23 +135,21 @@ function getMemberList() {
         let elements = getRenderElements();
 
         elements.forEach(element => {
-            let memberEntryInRoles = getMemberEntriesById(element, memberId)
-            if(!memberEntryInRoles) return;
+            let entries = getMemberEntriesById(element, memberId);
+            if(!entries.length) return;
 
-            memberEntryInRoles.forEach(entry => {
-                let userRoleContainer = entry.closest(".infolist-role")
-                let userRoleEntryId = userRoleContainer?.getAttribute("data-role-id");
+            entries.forEach(entry => {
+                let roleContainer = entry.closest(".infolist-role");
+                let roleContainerId = roleContainer?.getAttribute("data-role-id");
 
-                if(Number(userRoleEntryId) !== Number(roleId)){
-                    entry?.remove();
+                if(Number(roleContainerId) !== Number(roleId)){
+                    entry.remove();
                 }
-
-                if(getMemberEntriesById(element, memberId).length === 0){
-                    userRoleContainer?.remove()
-                }
-            })
+            });
         });
     }
+
+
 
     function getMemberEntriesFromRoleId(element, roleId){
         return element.querySelectorAll(`.infolist-role[data-role-id="${roleId}"] .memberlist-container`);
@@ -177,27 +181,38 @@ function getMemberList() {
     function insertMemberIntoRole(memberObject, roleId, memberHTML){
         let elements = getRenderElements();
 
-        removeMemberFromOtherRoles(memberObject.id, roleId)
+        removeMemberFromOtherRoles(memberObject.id, roleId);
 
         elements.forEach(element => {
             let roleHeaderElement = element.querySelector(`.infolist-role[data-role-id="${roleId}"]`);
-            let alreadyExistsInRole = roleHeaderElement.querySelector(`.memberlist-container[data-member-id="${memberObject.id}"]`);
+            if(!roleHeaderElement) return;
+
+            let alreadyExistsInRole = roleHeaderElement.querySelector(
+                `.memberlist-container[data-member-id="${memberObject.id}"]`
+            );
 
             if(!alreadyExistsInRole){
                 roleHeaderElement.insertAdjacentHTML("beforeend", memberHTML);
             }
             else{
-                let memberIcon = alreadyExistsInRole.querySelector(".memberlist-img");
-                let memberName = alreadyExistsInRole.querySelector(".memberlist-member-info.name span");
+                let memberIcon   = alreadyExistsInRole.querySelector(".memberlist-img");
+                let memberName   = alreadyExistsInRole.querySelector(".memberlist-member-info.name span");
                 let memberStatus = alreadyExistsInRole.querySelector(".memberlist-member-info.status span");
-                if(!memberStatus) localStorage.setItem("memberlist_html_cache", "");
 
-                if(memberIcon && memberObject?.icon !== "null" && memberIcon?.src !== memberObject.icon) memberIcon.setAttribute("src", memberObject.icon);
-                if(memberName && memberName?.innerText !== memberObject?.name) memberName.innerText = memberObject?.name;
-                if(memberStatus && memberStatus?.innerText !== memberObject?.status) memberStatus.innerText = memberObject?.status;
+                if(memberIcon){
+                    memberIcon.classList.toggle("offline_pfp", !!memberObject.isOffline);
+                }
+
+                if(memberName && memberName.innerText !== memberObject.name){
+                    memberName.innerText = memberObject.name;
+                }
+                if(memberStatus && memberStatus.innerText !== memberObject.status){
+                    memberStatus.innerText = memberObject.status;
+                }
             }
         });
     }
+
 
     function getRoleHTML(role){
         return `<div class="infolist-role" data-sort-id="${role.info.sortId}" data-role-id="${role.info.id}" title="${role.info.name}" style="color: ${role.info.color};">

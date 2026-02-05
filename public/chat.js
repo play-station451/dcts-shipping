@@ -9,6 +9,43 @@ document.addEventListener("error", (e) => {
 }, true);
 
 
+function rewriteImg(img){
+    if(!img || !img.src) return;
+
+    if(img.dataset.proxied === "1") return;
+
+    const proxied = ChatManager.proxyUrl(img.src);
+    if(proxied !== img.src){
+        img.src = proxied;
+    }
+
+    img.dataset.proxied = "1";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("img").forEach(rewriteImg);
+
+    new MutationObserver(mutations => {
+        for(const m of mutations){
+            for(const n of m.addedNodes){
+                if(n.nodeType !== 1) continue;
+
+                if(n.tagName === "IMG"){
+                    rewriteImg(n);
+                }
+                else{
+                    n.querySelectorAll?.("img").forEach(rewriteImg);
+                }
+            }
+        }
+    }).observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+});
+
+
+
 let customPrompts
 let tooltipSystem
 let customAlerts
@@ -278,7 +315,70 @@ document.addEventListener("DOMContentLoaded", async function () {
             Inbox.toggleInbox();
         },
         async (data) => {
-            return !document.querySelector(".inbox-container")?.contains(data.event.target)
+            const inbox = document.querySelector(".inbox-container");
+            if(!inbox) return true;
+
+            return !inbox.contains(data.event.target);
+        }
+    )
+
+
+    ContextMenu.registerClickEvent(
+        "inbox reply",
+        [
+            ".headerIcon.inbox .inbox-container .inbox-content .entry"
+        ],
+        async (data) => {
+
+            await PageRenderer.renderHTML(data.element.closest(".inbox-container"),
+                `
+                    <div class="inbox-reply">
+                        <span onclick="PageRenderer.remove();">« Back</span>
+                        
+                        <div class="inbox-content">
+                            ${data.element.closest(".entry").outerHTML}
+                        </div>
+                        
+                        <span>Reply</span>
+                        <div class="inbox-editor"></div>
+                    </div>
+
+                    `
+            )
+
+            let entry = PageRenderer.Element().querySelector(".entry");
+            if(!entry) return console.error("Couldnt find inbox reply")
+
+            let messageId = findAttributeUp(entry, "data-message-id")
+            let inboxId = findAttributeUp(entry, "data-inbox-id")
+
+            const editor = new RichEditor({
+                selector: ".page-renderer .inbox-editor",
+                toolbar: [
+                    ["bold", "italic", "underline"],
+                    ["code-block", "link"]
+                ],
+                onImg: async (src) => {
+                    console.log("Uploading and replacing src " + src)
+                    let upload = await ChatManager.srcToFile(src);
+                    editor.insertImage(upload.path)
+                },
+                onSend: async(html) => {
+                    console.log(html, messageId);
+                    if(!messageId) throw new Error("Couldnt find inbox reply message id")
+
+                    replyMessageId = messageId;
+                    let wasSent = sendMessageToServer(null, null, null, html, true);
+
+                    if(wasSent){
+                        Inbox.markAsRead(inboxId)
+                        editor.clear()
+                    }
+                }
+            });
+
+
+            console.log("rendered")
         }
     )
 
@@ -302,9 +402,11 @@ document.addEventListener("DOMContentLoaded", async function () {
             // inbox
             let inboxContainer = document.querySelector(".inbox-container");
             if(inboxContainer && inboxContainer?.style?.display === "flex" &&
-                (!inboxContainer?.contains(data.element) && !data?.element?.classList?.contains("inbox")))
+                (!inboxContainer?.contains(data.element) && !data?.element?.classList?.contains("inbox")) &&
+                (!PageRenderer?.Element()?.contains(data.element))
+            )
             {
-                inboxContainer.style.display = "none";
+                //inboxContainer.style.display = "none";
             }
 
             // refocus editor
@@ -1258,7 +1360,11 @@ function replaceInlineEmojis() {
 }
 
 
-async function sendMessageToServer(authorId, authorUsername, pfp, message, bypassQuill = false) {
+async function sendMessageToServer(authorId = UserManager.getID(),
+                                   authorUsername = UserManager.getUsername(),
+                                   pfp = UserManager.getPFP(),
+                                   message,
+                                   bypassQuill = false) {
     Clock.start("send_message");
     let isScrolledDown = isScrolledToBottom(document.getElementById("content"));
 
@@ -1323,6 +1429,8 @@ async function sendMessageToServer(authorId, authorUsername, pfp, message, bypas
     scrollDown("sendMessageToServer"); // forgot that
     setTimeout(() => focusEditor(), 1)
     Clock.stop("send_message");
+
+    return true;
 }
 
 

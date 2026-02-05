@@ -79,26 +79,26 @@ class Inbox {
         }, 1)
 
         async function createMessageContentHTML(item, messageId) {
-            let message = (await (await ChatManager.resolveMessage(messageId))?.message);
+            let message = await ChatManager.resolveMessage(messageId);
             if (!message) {
                 console.error(`Couldnt resolve message for inbox. Message id: ${messageId}`);
                 return null;
             }
 
-            if (message?.id === UserManager.getID()) return null;
+            if (message?.author?.id === UserManager.getID()) return null;
 
-            let title = (await convertMention(sanitizeHtmlForRender(`<@${message?.id}> mentioned you in <#@${message?.channel}>:`), true)).text;
-            if (message?.reply) title = (await convertMention(sanitizeHtmlForRender(`<@${message?.id}> replied to your message in <#@${message?.channel}>:`), true)).text;
+            let title = (await convertMention(sanitizeHtmlForRender(`<@${message?.author?.id}> mentioned you in <#@${message?.channel}>:`), true)).text;
+            if (message?.reply) title = (await convertMention(sanitizeHtmlForRender(`<@${message?.author?.id}> replied to your message in <#@${message?.channel}>:`), true)).text;
 
             let contentBody = (await (convertMention((message?.message), true))).text;
             contentBody = await text2Emoji(contentBody, true, true)
             contentBody = sanitizeHtmlForRender(contentBody)
 
             return `
-                 <div class="entry" data-inbox-id="${item?.inboxId}">                            
+                 <div class="entry" data-inbox-id="${item?.inboxId}" data-message-id="${message.messageId}" data-author-id="${message?.author?.id}">                            
                     <div class="content">                        
                         <div class="headline"> 
-                            <img class="avatar" src="${message?.icon ? ChatManager.proxyUrl(message.icon) : "/img/default_pfp.png"}">
+                            <img class="avatar" src="${message?.author?.icon ? ChatManager.proxyUrl(message?.author?.icon) : "/img/default_pfp.png"}">
                                 ${title}
                         </div>
                         <p>

@@ -141,6 +141,42 @@
 <pre id="editorHints"></pre>
 
 <script>
+    function rewriteImg(img){
+        if(!img || !img.src) return;
+
+        if(img.dataset.proxied === "1") return;
+
+        const proxied = ChatManager.proxyUrl(img.src);
+        if(proxied !== img.src){
+            img.src = proxied;
+        }
+
+        img.dataset.proxied = "1";
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll("img").forEach(rewriteImg);
+
+        new MutationObserver(mutations => {
+            for(const m of mutations){
+                for(const n of m.addedNodes){
+                    if(n.nodeType !== 1) continue;
+
+                    if(n.tagName === "IMG"){
+                        rewriteImg(n);
+                    }
+                    else{
+                        n.querySelectorAll?.("img").forEach(rewriteImg);
+                    }
+                }
+            }
+        }).observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    });
+
+
     let quill = null;
     let focusEditor = null;
 

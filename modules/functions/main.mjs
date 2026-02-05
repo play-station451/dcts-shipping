@@ -609,6 +609,137 @@ export function checkBool(value, type) {
 
 export function checkConfigAdditions() {
 
+
+    // recreating the config example minimum base so that copying isnt needed anymore
+    checkObjectKeys(serverconfig, "serverinfo.name", "Default Server")
+    checkObjectKeys(serverconfig, "serverinfo.description", "")
+    checkObjectKeys(serverconfig, "serverinfo.port", 2052)
+    checkObjectKeys(serverconfig, "serverinfo.setup", 0)
+    checkObjectKeys(serverconfig, "serverinfo.maxUploadStorage", 1024)
+    checkObjectKeys(serverconfig, "serverinfo.rateLimit", 512)
+    checkObjectKeys(serverconfig, "serverinfo.dropInterval", 5)
+    //
+    checkObjectKeys(serverconfig, "serverinfo.useCloudflareImageCDN", "")
+    checkObjectKeys(serverconfig, "serverinfo.cfAccountId", "")
+    checkObjectKeys(serverconfig, "serverinfo.cfAccountToken", "")
+    checkObjectKeys(serverconfig, "serverinfo.cfHash", "")
+    //
+    checkObjectKeys(serverconfig, "ipblacklist", [])
+    checkObjectKeys(serverconfig, "banlist", {})
+    checkObjectKeys(serverconfig, "mutelist", {})
+    //
+    checkObjectKeys(serverconfig, "serverroles", {
+        "0": {
+            "info": {
+                "id": "0",
+                "name": "Member",
+                "icon": null,
+                "color": "#FFFFFF",
+                "deletable": 0,
+                "sortId": 1,
+                "displaySeperate": 1,
+                "hasRole": 1
+            },
+            "permissions": {
+                "readMessages": 1,
+                "sendMessages": 1,
+                "uploadFiles": 1,
+                "redeemKey": 1,
+                "maxUpload": "10",
+                "manageChannels": 0,
+                "viewChannelHistory": 1,
+                "createReports": 1
+            },
+            "members": [],
+            "token": []
+        },
+        "1": {
+            "info": {
+                "id": "1",
+                "name": "Offline",
+                "icon": null,
+                "color": "#7C808A",
+                "deletable": 0,
+                "sortId": 0,
+                "displaySeperate": 1,
+                "hasRole": 0
+            },
+            "permissions": {},
+            "members": [],
+            "token": []
+        },
+        "1111": {
+            "info": {
+                "id": 1111,
+                "name": "Admininistrator",
+                "icon": null,
+                "color": "#ff0000",
+                "deletable": 0,
+                "sortId": 3,
+                "displaySeperate": 1,
+                "hasRole": 1
+            },
+            "permissions": {
+                "readMessages": 1,
+                "administrator": 1,
+                "manageChannels": 0
+            },
+            "members": [],
+            "token": [
+            ]
+        }
+    });
+    checkObjectKeys(serverconfig, "groups", {
+        "0": {
+            "info": {
+                "id": 0,
+                "name": "Home",
+                "icon": "img/default_icon.png",
+                "banner": "/img/default_banner.png",
+                "isDeletable": 1,
+                "sortId": 2,
+                "access": []
+            },
+            "channels": {
+                "categories": {
+                    "0": {
+                        "info": {
+                            "id": 0,
+                            "name": "General",
+                            "sortId": 2
+                        },
+                        "channel": {
+                            "0": {
+                                "id": 0,
+                                "name": "chat",
+                                "type": "text",
+                                "description": "",
+                                "sortId": 0,
+                                "permissions": {
+                                    "0": {
+                                        "readMessages": 1,
+                                        "sendMessages": 1,
+                                        "viewChannel": 1,
+                                        "viewChannelHistory": 1
+                                    }
+                                },
+                                "msgCount": 0
+                            }
+                        }
+                    }
+                }
+            },
+            "permissions": {
+                "0": {
+                    "viewGroup": 1,
+                    "sendMessages": 1,
+                    "readMessages": 1
+                }
+            }
+        }
+    })
+
+
     // new cool ip block shit
     checkObjectKeys(serverconfig, "serverinfo.moderation.ip.urlWhitelist",
         [
@@ -740,6 +871,7 @@ export function checkConfigAdditions() {
     // Added MySQL
     checkObjectKeys(serverconfig, "serverinfo.sql.enabled", false)
     checkObjectKeys(serverconfig, "serverinfo.sql.host", "localhost")
+    checkObjectKeys(serverconfig, "serverinfo.sql.port", 3306)
     checkObjectKeys(serverconfig, "serverinfo.sql.username", "")
     checkObjectKeys(serverconfig, "serverinfo.sql.password", "")
     checkObjectKeys(serverconfig, "serverinfo.sql.database", "dcts")

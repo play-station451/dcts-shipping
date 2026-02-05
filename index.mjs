@@ -126,27 +126,17 @@ checkServerDirectories();
 
 // check if config file exists
 checkFile("./plugins/settings.json", true, "{}");
-checkConfigFile();
-if (fs.existsSync("./config.json")) {
-    try {
-        fs.cpSync("./config.json", configPath);
-        fs.cpSync("./config.json", "./config.json.bak");
-        fs.unlinkSync("./config.json");
-    } catch (error) {
-        Logger.error("Error migrating config file automatically");
-        Logger.error(error);
-    }
-}
+
 
 /*
     Holy Server config file.
     needs to be above the imports else serverconfig will be undefined
  */
-export var serverconfig = JSON.parse(
-    fs.readFileSync(configPath, {encoding: "utf-8"}),
-);
-initConfig(configPath);
+
+export var serverconfig = fs.existsSync(configPath) ? JSONTools.tryParse(fs.readFileSync(configPath, {encoding: "utf-8"})) : {};
+
 checkConfigAdditions();
+
 
 // made by installer script
 if (fs.existsSync("./configs/sql.txt")) {
@@ -188,6 +178,7 @@ await saveConfig(serverconfig);
 // create sql pool
 export let db = new dSyncSql({
     host: process.env.DB_HOST || serverconfig.serverinfo.sql.host,
+    port: process.env.DB_PORT || serverconfig.serverinfo.sql.port,
     user: process.env.DB_USER || serverconfig.serverinfo.sql.username,
     password: process.env.DB_PASS || serverconfig.serverinfo.sql.password,
     database: process.env.DB_NAME || serverconfig.serverinfo.sql.database,
@@ -290,6 +281,7 @@ import {
     getMigrationTask
 } from "./modules/functions/migrations/helper.mjs";
 import {migrateOldMessagesToNewMessageSystemWithoutEncoding} from "./modules/functions/migrations/messageMigration.mjs";
+import JSONTools from "@hackthedev/json-tools";
 
 /*
     Files for the plugin system

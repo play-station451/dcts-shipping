@@ -15,6 +15,11 @@ import sanitizeHtml from "sanitize-html";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 
+// dSync Libs
+import dSyncAuth from "@hackthedev/dsync-auth";
+import {dSyncSign} from "@hackthedev/dsync-sign";
+import dSync from "@hackthedev/dsync";
+
 import Logger from "@hackthedev/terminal-logger"
 import dSyncSql from "@hackthedev/dsync-sql"
 import dSyncIPSec from "@hackthedev/dsync-ipsec"
@@ -79,13 +84,6 @@ export let socketToIP = [];
 export let allowLogging = false;
 export let debugmode = process.env.DEBUG || false;
 export let configPath = "./configs/config.json";
-
-// dSync Libss
-import dSyncAuth from "@hackthedev/dsync-auth";
-//import dSyncAuth from '../../../dSyncAuth/index.mjs';
-import {dSyncSign} from "@hackthedev/dsync-sign";
-//import { dSyncSign } from "../dSyncSign/index.mjs"
-import dSync from "@hackthedev/dsync";
 
 export let syncer = new dSync("dcts", app);
 export const signer = new dSyncSign("./configs/privatekey.json");

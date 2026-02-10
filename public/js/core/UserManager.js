@@ -351,7 +351,11 @@ class UserManager {
     }
 
     static getToken() {
-        var token = CookieManager.getCookie("dcts_token");
+        var token = CookieManager.getCookie("token");
+        if(!token && CookieManager.getCookie("dcts_token")) {
+            token = CookieManager.getCookie("dcts_token");
+            localStorage.setItem("token", token);
+        }
 
         if (token == null || token.length <= 0) {
             return null;

@@ -1,10 +1,21 @@
 import JSONTools from "@hackthedev/json-tools";
 import path from "path";
+
 import dSyncPay from '@hackthedev/dsync-pay';
+import dSyncShop from '@hackthedev/dsync-shop';
+//import dSyncPay from 'E:\\network-z-dev\\dSyncPay\\index.mjs';
+//import dSyncShop from "E:\\network-z-dev\\dSyncShop\\index.mjs";
+
+
+import {db} from "../../index.mjs";
+import express from "express";
+import {validateMemberId} from "./main.mjs";
 
 export let paymentConfig = {}
 let paymentConfigPath = path.join(path.resolve(), "configs", "payments.json")
+
 export let payments;
+export let shop;
 
 export function initPaymentSystem(app){
     // create payments config
@@ -17,7 +28,7 @@ export function initPaymentSystem(app){
     JSONTools.checkObjectKeys(paymentConfig, "paypal.sandbox.secret", "xxx", true)
     JSONTools.checkObjectKeys(paymentConfig, "paypal.live.id", "xxx", true)
     JSONTools.checkObjectKeys(paymentConfig, "paypal.live.secret", "xxx", true)
-    JSONTools.checkObjectKeys(paymentConfig, "paypal.use_sanbox", true, true)
+    JSONTools.checkObjectKeys(paymentConfig, "paypal.use_sandbox", true, true)
     //
     JSONTools.checkObjectKeys(paymentConfig, "coinbase.key", "xxx", true)
     JSONTools.checkObjectKeys(paymentConfig, "coinbase.webhook", "xxx", true)
@@ -46,4 +57,49 @@ export function initPaymentSystem(app){
         onSubscriptionActivated: (data) => { console.log("sub activated", data);},
         onSubscriptionCancelled: (data) => { console.log("sub canceled", data);},
     });
+
+    shop = new dSyncShop({
+        app,
+        express,
+        payments,
+        db,
+        isAdmin: async (req) => {
+            const token = req.headers['x-token'];
+            const userId = req.headers['x-user-id'];
+            if (!token || !userId) return false
+
+            return validateMemberId(userId, null, token);
+        },
+        enrichMetadata: async (req) => {
+            const token = req.headers['x-token'];
+            const userId = req.headers['x-user-id'];
+            if (!token || !userId) throw new Error('missing auth headers');
+
+            if(!validateMemberId(userId, null, token)) throw new Error('Failed auth');
+
+            return { userId, token };
+        },
+        productActions: {
+            'give_role': {
+                label: 'Give Role',
+                params: [
+                    { key: 'role', label: 'Role ID', type: 'text' }
+                ],
+                handler: async (metadata, product, params) => {
+                    console.log(metadata, params);
+                    //await giveRoleToMember(metadata.userId, params.role);
+                }
+            },
+            'remove_role': {
+                label: 'Remove Role',
+                params: [
+                    { key: 'role', label: 'Role ID', type: 'text' }
+                ],
+                handler: async (metadata, product, params) => {
+                    console.log(params);
+                    //await removeRoleFromMember(metadata.userId, params.role);
+                }
+            }
+        }
+    })
 }

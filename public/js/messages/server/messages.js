@@ -415,7 +415,6 @@ function editMessage(id) {
     }
     editMessageId = msgContent.getAttribute("data-message-id");
 
-    console.log(msgContent.innerHTML)
     setTimeout(() => {
         const regex = /<p>\s*<\/p>/gm;
         if(quill) quill.pasteUnconverted(msgContent.innerHTML.replace(regex, ''));

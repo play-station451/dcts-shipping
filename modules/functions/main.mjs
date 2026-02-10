@@ -1062,7 +1062,7 @@ export function generateId(length) {
 }
 
 export function validateMemberId(id, socket, token, bypass = false) {
-    if (bypass === false) {
+    if (bypass === false && socket) {
         checkRateLimit(socket);
     }
 
@@ -1070,14 +1070,14 @@ export function validateMemberId(id, socket, token, bypass = false) {
         return false;
     }
 
-    if (!powVerifiedUsers.includes(socket?.id)) {
+    if (socket && !powVerifiedUsers.includes(socket?.id)) {
         return false;
     }
 
     // check member token if present
     if(id && token){
         let memberObject = serverconfig.servermembers[id];
-        if(memberObject) checkMemberBan(socket, memberObject);
+        if(memberObject && socket) checkMemberBan(socket, memberObject);
 
         if(serverconfig.servermembers[id]?.token !== token){
             return false;

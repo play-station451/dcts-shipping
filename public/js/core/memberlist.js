@@ -182,6 +182,7 @@ function getMemberList() {
         let elements = getRenderElements();
 
         removeMemberFromOtherRoles(memberObject.id, roleId);
+        if(memberObject.status === "null") memberObject.status = null;
 
         elements.forEach(element => {
             let roleHeaderElement = element.querySelector(`.infolist-role[data-role-id="${roleId}"]`);

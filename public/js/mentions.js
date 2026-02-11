@@ -200,7 +200,9 @@ async function updateMentionAutocompleteData() {
 
     let currentGroupCategories = channeltree.data.groups[UserManager.getGroup()].categories;
     let channels = {};
+
     mentionList = [];
+    mentionAc.clear();
 
     // handle channels
     for (let cat of Object.keys(currentGroupCategories)) {

@@ -49,6 +49,8 @@ class UserManager {
                         </div>`
         }
 
+        if(memberObj?.status === "null") memberObj.status = null;
+
         return `
             <div id="profile_banner" draggable="false" style="background-image: url('${ChatManager.proxyUrl(memberObj?.banner)}')"></div>
         
@@ -82,7 +84,7 @@ class UserManager {
         
             <div id="profile_content">       
                 <div id="profile_username"><h2 style="margin-bottom: 0 !important;">${memberObj?.name}</h2></div>                
-                <div id="profile_status">${ChatManager.countryCodeToEmoji(memberObj?.country_code)} <i>${memberObj?.status}</i></div>                
+                <div id="profile_status">${ChatManager.countryCodeToEmoji(memberObj?.country_code)} <i>${memberObj?.status ? memberObj?.status : ""}</i></div>                
                 <div id="profile_badge_container" data-gid="${isLauncher() ? await Crypto.GenerateGid(memberObj?.publicKey) : ""}"></div> 
                 
                 <div class="profile_aboutme">       

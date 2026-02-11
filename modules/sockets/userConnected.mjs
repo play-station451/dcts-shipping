@@ -175,7 +175,6 @@ export default (io) => (socket) => {
             xssFilters.inHTMLData(normaliseString(member.onboarding)) === "true";
         member.password =
             xssFilters.inHTMLData(normaliseString(member.password)) || null;
-
         member.group = xssFilters.inHTMLData(normaliseString(member.group));
         member.category = xssFilters.inHTMLData(normaliseString(member.category));
         member.channel = xssFilters.inHTMLData(normaliseString(member.channel));
@@ -189,8 +188,6 @@ export default (io) => (socket) => {
         // base 64 too bad
         if (member?.icon?.startsWith("data:image")) member.icon = "";
         if (member?.banner?.startsWith("data:image")) member.banner = "";
-
-        if (!member?.name) member.name = "Member";
 
         // if pow has been passed. used for quicker initial connection to skip pow challenge
         if (member?.pow?.challenge)
@@ -394,8 +391,8 @@ export default (io) => (socket) => {
                             "token": "${serverconfig.servermembers[member.id].token}",
                             "icon": "${serverconfig.servermembers[member.id].icon}",
                             "banner": "${serverconfig.servermembers[member.id].banner}",
-                            "status": "${serverconfig.servermembers[member.id].status}",
-                            "aboutme": "${serverconfig.servermembers[member.id].aboutme}",
+                            "status": "${serverconfig.servermembers[member.id].status || ""}",
+                            "aboutme": "${serverconfig.servermembers[member.id].aboutme || ""}",
                             "loginName": "${serverconfig.servermembers[member.id].loginName}",
                             "type": "success"
                         }`,
@@ -525,13 +522,13 @@ export default (io) => (socket) => {
                     }
                 }
 
-                serverconfig.servermembers[member.id].name = xssFilters.inHTMLData(
+                if(member?.name) serverconfig.servermembers[member.id].name = xssFilters.inHTMLData(
                     member.name,
                 );
-                serverconfig.servermembers[member.id].status = xssFilters.inHTMLData(
+                if(member?.status) serverconfig.servermembers[member.id].status = xssFilters.inHTMLData(
                     member.status,
                 );
-                serverconfig.servermembers[member.id].aboutme = xssFilters.inHTMLData(
+                if(member?.aboutme) serverconfig.servermembers[member.id].aboutme = xssFilters.inHTMLData(
                     member.aboutme,
                 );
                 if (member.icon) serverconfig.servermembers[member.id].icon = xssFilters.inHTMLData(

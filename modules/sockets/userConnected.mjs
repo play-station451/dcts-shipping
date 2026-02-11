@@ -255,7 +255,7 @@ export default (io) => (socket) => {
         let banText = "";
 
         if (banResult?.timestamp) {
-            if (new Date(banResult.timestamp).getFullYear() === "9999") {
+            if (new Date(banResult.timestamp).getFullYear() === 9999) {
                 banText = "banned permanently";
             } else {
                 banText = `banned until <br>${formatDateTime(new Date(banResult.timestamp))}`;

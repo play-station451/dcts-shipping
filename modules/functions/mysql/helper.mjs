@@ -1,8 +1,7 @@
 import {queryDatabase} from "./mysql.mjs";
 import {XMLHttpRequest, fetch, serverconfig} from "../../../index.mjs";
 import Logger from "@hackthedev/terminal-logger"
-import fs from "fs";
-import {spawn} from "node:child_process";
+
 
 export async function saveMemberToDB(id, data) {
     if (!data || typeof data !== "object" || !id) return console.log("[saveMemberToDB] invalid data", data);
@@ -26,28 +25,8 @@ export async function saveMemberToDB(id, data) {
     }
 }
 
-export async function exportDatabaseFromPool(pool, outFile) {
-    return;
-    let host = process.env.DB_HOST || serverconfig.serverinfo.sql.host;
-    let user = process.env.DB_USER || serverconfig.serverinfo.sql.username;
-    let password = process.env.DB_PASS || serverconfig.serverinfo.sql.password;
-    let database = process.env.DB_NAME || serverconfig.serverinfo.sql.database;
 
-    return await new Promise((resolve, reject) => {
-        const dump = spawn("mariadb-dump", [
-            "-h", host,
-            "-u", user,
-            `-p${password}`,
-            database
-        ]);
 
-        const stream = fs.createWriteStream(outFile);
-
-        dump.stdout.pipe(stream);
-        dump.stderr.on("data", d => reject(d.toString()));
-        dump.on("close", code => code === 0 ? resolve() : reject(code));
-    });
-}
 
 export async function loadMembersFromDB() {
     if (!serverconfig || typeof serverconfig !== "object") return;
@@ -95,7 +74,7 @@ export async function getMediaUrlFromCache(url) {
     return await queryDatabase(query, [url]);
 }
 
-export async function saveReport(reportCreator, reportedUser, reportType, reportData = nul, reportNotes = null) {
+export async function saveReport(reportCreator, reportedUser, reportType, reportData = null, reportNotes = null) {
     const query = `INSERT INTO reports (reportCreator, reportedUser, reportType, reportData, reportNotes)
                    VALUES (?, ?, ?, ?, ?)`;
     return await queryDatabase(query, [reportCreator, reportedUser, reportType, reportData, reportNotes]);

@@ -47,7 +47,7 @@ export function listenToPow(socket) {
                     let banResult = await checkMemberBan(socket, serverconfig.servermembers[data.id]);
                     let banText = "";
                     if (banResult?.timestamp) {
-                        if (new Date(banResult.timestamp).getFullYear() === "9999") {
+                        if (new Date(banResult.timestamp).getFullYear() === 9999) {
                             banText = "banned permanently";
                         }
                         else {

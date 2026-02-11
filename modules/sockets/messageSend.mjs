@@ -196,7 +196,7 @@ export default (io) => (socket) => {
                     member = getCastingMemberObject(member);
                     member.author = getCastingMemberObject(serverconfig.servermembers[member.author?.id]);
 
-                    serverconfig.groups[member.group].channels.categories[member.category].channel[member.channel].msgCount + 1;
+                    // msgCount is incremented in saveChatMessage()
 
                     // Save the Chat Message to file
                     saveChatMessage(member, member.editedMsgId);

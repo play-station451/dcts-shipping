@@ -164,17 +164,16 @@ export default (io) => (socket) => {
         member.loginName = xssFilters.inHTMLData(normaliseString(member.loginName));
 
         if (member?.name) member.name = xssFilters.inHTMLData(normaliseString(member.name));
-        if (member?.status) member.status = truncateText(xssFilters.inHTMLData(normaliseString(member.status)), 25,);
+        if (member?.status) member.status = truncateText(xssFilters.inHTMLData(normaliseString(member.status)), 25);
 
-        if (member?.aboutme) member.aboutme = truncateText(xssFilters.inHTMLData(normaliseString(member.aboutme)), 500,);
+        if (member?.aboutme) member.aboutme = truncateText(xssFilters.inHTMLData(normaliseString(member.aboutme)), 500);
         if (member?.icon) member.icon = xssFilters.inHTMLData(normaliseString(member.icon));
         if (member?.banner) member.banner = xssFilters.inHTMLData(normaliseString(member.banner));
 
         member.token = xssFilters.inHTMLData(normaliseString(member.token));
-        member.onboarding =
-            xssFilters.inHTMLData(normaliseString(member.onboarding)) === "true";
-        member.password =
-            xssFilters.inHTMLData(normaliseString(member.password)) || null;
+        member.onboarding = xssFilters.inHTMLData(normaliseString(member.onboarding)) === "true";
+        member.password = xssFilters.inHTMLData(normaliseString(member.password)) || null;
+
         member.group = xssFilters.inHTMLData(normaliseString(member.group));
         member.category = xssFilters.inHTMLData(normaliseString(member.category));
         member.channel = xssFilters.inHTMLData(normaliseString(member.channel));
@@ -523,19 +522,19 @@ export default (io) => (socket) => {
                 }
 
                 if(member?.name) serverconfig.servermembers[member.id].name = xssFilters.inHTMLData(
-                    member.name,
+                    member.name
                 );
                 if(member?.status) serverconfig.servermembers[member.id].status = xssFilters.inHTMLData(
-                    member.status,
+                    member.status
                 );
                 if(member?.aboutme) serverconfig.servermembers[member.id].aboutme = xssFilters.inHTMLData(
-                    member.aboutme,
+                    member.aboutme
                 );
                 if (member.icon) serverconfig.servermembers[member.id].icon = xssFilters.inHTMLData(
-                    member.icon,
+                    member.icon
                 );
                 if (member.banner) serverconfig.servermembers[member.id].banner = xssFilters.inHTMLData(
-                    member.banner,
+                    member.banner
                 );
 
                 if (member.country_code) serverconfig.servermembers[member.id].country_code = member.country_code;

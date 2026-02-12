@@ -6,6 +6,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         var page = getUrlParams("page") || "profile";
         loadPageContent(page)
     });
+
+    ContextMenu.init();
 })
 
 function setUrl(param) {

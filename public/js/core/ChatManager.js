@@ -133,12 +133,15 @@ class ChatManager {
         function initThemePageContext(){
             if(window.didInitthemePageContext) return;
 
+            console.log("did init")
+
             ContextMenu.registerClickEvent(
-                "theme page",
+                "theme page selector",
                 [
                     ".theme-page .theme-entries .theme-entry"
                 ],
                 async (data) => {
+                    console.log(data)
                     let theme = findAttributeUp(data.element, "data-theme");
                     if (!theme) {
                         console.warn("Couldnt get theme from element");

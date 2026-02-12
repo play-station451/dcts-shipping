@@ -6,7 +6,14 @@ document.addEventListener("DOMContentLoaded", () => {
     customPrompts = new Prompt();
 })
 
-
+function findAttributeUp(element, attr, maxDepth = 10) {
+    for (let i = 0; i <= maxDepth && element; i++) {
+        const val = element.getAttribute?.(attr);
+        if (val !== null) return val;
+        element = element.parentNode;
+    }
+    return null;
+}
 
 function doInit(callback) {
     socket.emit("userConnected", {

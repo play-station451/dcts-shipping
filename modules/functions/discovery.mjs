@@ -96,16 +96,16 @@ export async function checkHostDiscovery(address, forceSync = false){
         else{
             if(!forceSync){
                 Logger.warn(`Unable to discover host ${address} ( ${serverDiscoveryResponse.status} )`);
-                logger.warn(serverDiscoveryResponse?.statusText);
+                Logger.warn(serverDiscoveryResponse?.statusText);
             }
             else if(forceSync){
                 Logger.warn(`Unable to sync with host ${address} ( ${serverDiscoveryResponse.status} )`);
-                logger.warn("Error: ", serverDiscoveryResponse?.statusText);
+                Logger.warn("Error: ", serverDiscoveryResponse?.statusText);
             }
         }
     }
     catch(error){
-        logger.warn(`Error while trying to discover host ${extractHost(address)} (${address}`)
-        logger.warn(error);
+        Logger.warn(`Error while trying to discover host ${extractHost(address)} (${address}`)
+        Logger.warn(error);
     }
 }

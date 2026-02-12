@@ -351,7 +351,7 @@ export async function saveChatMessage(message, editedMsgId = null) {
     }
 
     if(message?.reply){
-        let repliedMessage = await getMessageObjectById(message.reply.id);
+        let repliedMessage = await getMessageObjectById(message.reply.messageId);
         if(repliedMessage?.message && repliedMessage?.message?.author?.id !== message?.author?.id) await addInboxMessage(repliedMessage?.message?.authorId, {messageId: message.messageId}, "message",  message.messageId);
     }
 }

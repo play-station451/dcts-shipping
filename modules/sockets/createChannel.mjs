@@ -16,24 +16,23 @@ export default (io) => (socket) => {
             }
 
             try {
-                var channelId = generateId(4); 
-                serverconfig.groups[member.group].channels.categories[member.category].channel[channelId] = JSON.parse(
-                    `{
-                            "id": ${channelId},
-                            "name": "${xssFilters.inHTMLData(escapeHtml(member.value))}",
-                            "type": "${member.type}",
-                            "description": "Default Channel Description",
-                            "sortId": 0,
-                            "permissions": {
-                                "0": {
-                                    "viewChannelHistory": 0,
-                                    "readMessages": 0,
-                                    "sendMessages": 0,
-                                    "viewChannel": -1
-                                }
-                            }
+                var channelId = generateId(4);
+                serverconfig.groups[member.group].channels.categories[member.category].channel[channelId] = {
+                    id: channelId,
+                    name: xssFilters.inHTMLData(escapeHtml(member.value)),
+                    type: member.type,
+                    description: "Default Channel Description",
+                    sortId: 0,
+                    permissions: {
+                        0: {
+                            viewChannelHistory: 0,
+                            readMessages: 0,
+                            sendMessages: 0,
+                            viewChannel: -1
                         }
-                    `);                  
+                    }
+                };
+
 
                 saveConfig(serverconfig);
                 io.emit("receiveChannelTree", getChannelTree(member));

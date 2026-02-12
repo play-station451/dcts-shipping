@@ -35,7 +35,7 @@ export default (io) => (socket) => {
                 serverconfig.groups[groupId] = JSON.parse(
                     `{
                         "info": {
-                            "id": ${groupId},
+                            "id": "${groupId}",
                             "name": "${xssFilters.inHTMLData(member.value)}",
                             "icon": "/img/default_icon.png",
                             "banner": "/img/default_banner.png",

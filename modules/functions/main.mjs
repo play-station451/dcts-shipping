@@ -14,6 +14,7 @@ import {
     usersocket,
     sanitizeHtml,
     bcrypt,
+    crypto,
     fs, signer, db
 } from "../../index.mjs"
 import {
@@ -30,7 +31,7 @@ import Logger from "@hackthedev/terminal-logger"
 import path from "path";
 import {powVerifiedUsers} from "../sockets/pow.mjs";
 import {sendSystemMessage} from "../sockets/home/general.mjs";
-import {decodeFromBase64, encodeToBase64, exportDatabaseFromPool} from "./mysql/helper.mjs";
+import {decodeFromBase64, encodeToBase64} from "./mysql/helper.mjs";
 import {checkMemberMigration} from "./migrations/memberJsonToDb.mjs";
 import {clearBase64FromDatabase} from "./migrations/base64_fixer.mjs";
 import {getMemberHighestRole} from "./chat/helper.mjs";
@@ -140,8 +141,7 @@ export function sanitizeInput(input) {
             'strong',
             'em',
             'img',
-            'mark',
-            "iframe"
+            'mark'
         ],
         allowedAttributes: {
             'a': ['href', 'target', 'rel'],
@@ -229,31 +229,20 @@ export async function checkVersionUpdate() {
 
             if (res.status == 404) {
                 resolve(null);
-                return null;
             } else if (res.status == 200) {
                 var onlineVersionCode = await res.text();
                 onlineVersionCode = onlineVersionCode.replaceAll("\n\r", "").replaceAll("\n", "");
 
                 if (onlineVersionCode > versionCode) {
                     resolve(onlineVersionCode);
-                    return onlineVersionCode;
                 } else {
                     resolve(null);
-                    return null;
                 }
-
-                resolve(html);
-                return html;
             } else {
                 resolve(null);
-                return null;
             }
         })()
-
-
     });
-
-    return prom;
 }
 
 export async function handleTerminalCommands(command, args) {
@@ -1050,15 +1039,7 @@ export function limitString(text, limit) {
 }
 
 export function generateId(length) {
-    let result = '1';
-    const characters = '0123456789';
-    const charactersLength = characters.length;
-    let counter = 0;
-    while (counter < length - 1) {
-        result += characters.charAt(Math.floor(Math.random() * charactersLength));
-        counter += 1;
-    }
-    return result;
+    return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
 }
 
 export function validateMemberId(id, socket, token, bypass = false) {
@@ -1090,6 +1071,7 @@ export function validateMemberId(id, socket, token, bypass = false) {
     }
 
     if(id){
+        if(!serverconfig.servermembers[id]) return false;
         // update last online
         serverconfig.servermembers[id].lastOnline = new Date().getTime();
         if(serverconfig.servermembers[id]?.onboarding === false){
@@ -1177,8 +1159,7 @@ export function searchTenor(search, id) {
     var search_term = search;
 
     // using default locale of en_US
-    var search_url = "https://tenor.googleapis.com/v2/search?q=" + search_term + "&key=" +
-        apikey + "&client_key=" + clientkey + "&limit=" + lmt;
+    var search_url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(search_term)}&key=${apikey}&client_key=${clientkey}&limit=${lmt}`;
 
     httpGetAsync(search_url, tenorCallback_search, id);
 
@@ -1514,7 +1495,7 @@ export async function findAndVerifyUser(loginName, password) {
         // Check loginName matches either 'name'
         if (member.loginName === loginName) {
             // Verify the password hash
-            const isPasswordValid = bcrypt.compareSync(password, member.password);
+            const isPasswordValid = await bcrypt.compare(password, member.password);
             if (isPasswordValid) {
                 return {result: true, member: copyObject(member)}; // Return the matched user
             } else {

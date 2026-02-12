@@ -22,7 +22,6 @@ import dSync from "@hackthedev/dsync";
 
 import Logger from "@hackthedev/terminal-logger"
 import dSyncSql from "@hackthedev/dsync-sql"
-//import dSyncSql from "E:\\network-z-dev\\dSyncSql\\index.mjs"
 import dSyncIPSec from "@hackthedev/dsync-ipsec"
 import FrontendLibs from "@hackthedev/frontend-libs";
 
@@ -161,14 +160,18 @@ if (process.env.DB_PASS)
     serverconfig.serverinfo.sql.password = process.env.DB_PASS;
 if (process.env.DB_NAME)
     serverconfig.serverinfo.sql.database = process.env.DB_NAME;
-serverconfig.serverinfo.sql.enabled = true;
+if (process.env.DB_HOST || process.env.DB_USER || process.env.DB_PASS || process.env.DB_NAME) {
+    serverconfig.serverinfo.sql.enabled = true;
+}
 await saveConfig(serverconfig);
 
 // nicer warning
+serverconfig.serverinfo.sql.enabled = true;
 if(!serverconfig?.serverinfo?.sql?.username){
     Logger.warn("Congrats, setup worked! Please go to the /configs/config.json file and enter the SQL information under 'sql'");
     process.exit(0);
 }
+
 
 // create sql pool
 export let db = new dSyncSql({
@@ -234,7 +237,7 @@ import {
     saveChatMessage,
 } from "./modules/functions/io.mjs";
 
-import {checkIP, checkSSL} from "./modules/functions/http.mjs";
+import {checkSSL} from "./modules/functions/http.mjs";
 
 // Chat functions
 import {
@@ -264,7 +267,6 @@ import {Addon} from "./modules/functions/addon.mjs";
 // vc
 import {AccessToken, WebhookReceiver} from "livekit-server-sdk";
 import {
-    exportDatabaseFromPool,
     loadMembersFromDB,
     saveMemberToDB,
 } from "./modules/functions/mysql/helper.mjs";
@@ -418,15 +420,19 @@ const tables = [
             {name: "emojiHash", type: "longtext NOT NULL"},
             {name: "memberId", type: "varchar(100) NOT NULL"},
             {name: "react_timestamp", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"}
-        ]
+        ],
+        autoIncrement: "reactionId int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1",
     },
     {
         name: "ip_cache",
         columns: [
-            {name: "ip", type: "varchar(100) NOT NULL PRIMARY KEY UNIQUE KEY"},
+            {name: "ip", type: "varchar(100) NOT NULL"},
             {name: "data", type: "longtext NOT NULL"},
             {name: "last_sync", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"}
-        ]
+        ],
+        keys: [
+            {name: "UNIQUE KEY", type: "ip (ip)"}]
+        ,
     },
     {
         name: "cache",
@@ -977,6 +983,7 @@ app.post("/token", async (req, res) => {
 
     if (!hasPermission(memberId, "useVOIP", channelId)) {
         res.status(403).json({error: "You're not allowed to chat here"});
+        return;
     }
 
     const at = new AccessToken(API_KEY, API_SECRET, {
@@ -1203,50 +1210,7 @@ function initConfig(filePath) {
     }
 }
 
-// probably deprecated too now
-function getChanges(original, updated) {
-    const changes = {};
 
-    Object.keys(updated).forEach((key) => {
-        if (typeof updated[key] === "object" && updated[key] !== null) {
-            if (!original[key] || typeof original[key] !== "object") {
-                changes[key] = updated[key];
-            } else {
-                const nestedChanges = getChanges(original[key], updated[key]);
-                if (Object.keys(nestedChanges).length > 0) {
-                    changes[key] = nestedChanges;
-                }
-            }
-        } else if (original[key] !== updated[key]) {
-            changes[key] = updated[key];
-        }
-    });
-
-    Object.keys(original).forEach((key) => {
-        if (!(key in updated)) {
-            changes[key] = "__DELETE__";
-        }
-    });
-
-    return changes;
-}
-
-// potentially deprecated
-function applyChanges(target, changes) {
-    Object.keys(changes).forEach((key) => {
-        if (changes[key] === "__DELETE__") {
-            delete target[key];
-        } else if (typeof changes[key] === "object" && changes[key] !== null) {
-            if (!target[key] || typeof target[key] !== "object") {
-                target[key] = changes[key];
-            } else {
-                applyChanges(target[key], changes[key]);
-            }
-        } else {
-            target[key] = changes[key];
-        }
-    });
-}
 
 export async function saveConfig(config) {
     if (!config) return;

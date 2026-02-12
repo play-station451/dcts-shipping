@@ -2,29 +2,8 @@ import {queryDatabase} from "./mysql.mjs";
 import {XMLHttpRequest, fetch, serverconfig} from "../../../index.mjs";
 import Logger from "@hackthedev/terminal-logger"
 import fs from "fs";
-import {spawn} from "node:child_process";
+import {spawn} from "child_process";
 
-export async function saveMemberToDB(id, data) {
-    if (!data || typeof data !== "object" || !id) return console.log("[saveMemberToDB] invalid data", data);
-
-    const cols = Object.keys(data);
-    const vals = Object.values(data);
-    const placeholders = cols.map(() => "?").join(",");
-
-    const sql = `
-        INSERT INTO members (${cols.join(",")})
-        VALUES (${placeholders})
-            ON DUPLICATE KEY UPDATE
-                                 ${cols.map(c => `${c}=VALUES(${c})`).join(",")}
-    `;
-
-
-    try {
-        await queryDatabase(sql, vals);
-    } catch (err) {
-        Logger.debug(err);
-    }
-}
 
 export async function exportDatabaseFromPool(pool, outFile) {
     return;
@@ -48,6 +27,31 @@ export async function exportDatabaseFromPool(pool, outFile) {
         dump.on("close", code => code === 0 ? resolve() : reject(code));
     });
 }
+
+export async function saveMemberToDB(id, data) {
+    if (!data || typeof data !== "object" || !id) return console.log("[saveMemberToDB] invalid data", data);
+
+    const cols = Object.keys(data);
+    const vals = Object.values(data);
+    const placeholders = cols.map(() => "?").join(",");
+
+    const sql = `
+        INSERT INTO members (${cols.join(",")})
+        VALUES (${placeholders})
+            ON DUPLICATE KEY UPDATE
+                                 ${cols.map(c => `${c}=VALUES(${c})`).join(",")}
+    `;
+
+
+    try {
+        await queryDatabase(sql, vals);
+    } catch (err) {
+        Logger.debug(err);
+    }
+}
+
+
+
 
 export async function loadMembersFromDB() {
     if (!serverconfig || typeof serverconfig !== "object") return;
@@ -95,7 +99,7 @@ export async function getMediaUrlFromCache(url) {
     return await queryDatabase(query, [url]);
 }
 
-export async function saveReport(reportCreator, reportedUser, reportType, reportData = nul, reportNotes = null) {
+export async function saveReport(reportCreator, reportedUser, reportType, reportData = null, reportNotes = null) {
     const query = `INSERT INTO reports (reportCreator, reportedUser, reportType, reportData, reportNotes)
                    VALUES (?, ?, ?, ?, ?)`;
     return await queryDatabase(query, [reportCreator, reportedUser, reportType, reportData, reportNotes]);

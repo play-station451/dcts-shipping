@@ -10,25 +10,34 @@ let screenStartTs = {};
 let screenStreams = {};
 let pipLastStream = null;
 
+let fsMuteCache = new Map();
+
 async function setVcVolume(mid, isScreen, percent){
     const p = Math.max(0, Math.min(400, Number(percent) || 0));
     voip.setVolume(mid, isScreen, p);
 
+    const key = `${mid}:${isScreen ? "screen" : "user"}`;
+    if (fsMuteCache.has(key)) fsMuteCache.delete(key);
+
     const audioId = `audio-global-${mid}${isScreen ? '-screen' : ''}`;
     const el = document.getElementById(audioId);
 
-    if (el) el.volume = Math.max(0, Math.min(1, p / 100));
-
-    await voip.ensureAudioCtx().catch(()=>{});
-    if (el) await voip.attachAudioEl(mid, isScreen, el).catch(()=>{});
+    if (el) {
+        el.muted = true;
+        el.volume = 0;
+        await voip.ensureAudioCtx().catch(()=>{});
+        await voip.attachAudioEl(mid, isScreen, el).catch(()=>{});
+    }
 }
 
-
 async function hookVcAudio(mid, isScreen, audioEl){
+    audioEl.muted = true;
+    audioEl.volume = 0;
     await voip.ensureAudioCtx().catch(()=>{});
     await voip.attachAudioEl(mid, isScreen, audioEl).catch(()=>{});
     voip.setVolume(mid, isScreen, voip.getVolume(mid, isScreen));
 }
+
 
 function pickLatestActiveScreenshare() {
     let bestId = null;
@@ -672,9 +681,14 @@ function openFullscreen(memberId, isScreen) {
     if (!video || !video.srcObject) return;
     let fs = document.getElementById("vc-fullscreen");
     if (!fs) return;
+
     fs.querySelector("video").srcObject = video.srcObject;
     fs.style.display = "flex";
     fs.setAttribute("data-target", memberId);
+    fs.setAttribute("data-type", type);
+
+    const btn = fs.querySelector(".fs-controls .vc-btn");
+    if (btn) btn.innerHTML = "🔊";
 }
 
 function closeFullscreen() {
@@ -688,11 +702,23 @@ function closeFullscreen() {
 function toggleFullscreenMute(btn) {
     let fs = document.getElementById("vc-fullscreen");
     if (!fs) return;
-    let mid = fs.getAttribute("data-target");
-    let audio = document.getElementById(`audio-global-${mid}`) || document.getElementById(`audio-global-${mid}-screen`);
-    if (audio) {
-        audio.muted = !audio.muted;
-        btn.innerHTML = audio.muted ? "🔇" : "🔊";
+
+    const mid = fs.getAttribute("data-target");
+    const type = fs.getAttribute("data-type") || "user";
+    const isScreen = type === "screen";
+    if (!mid) return;
+
+    const key = `${mid}:${isScreen ? "screen" : "user"}`;
+
+    if (!fsMuteCache.has(key)) {
+        fsMuteCache.set(key, voip.getVolume(mid, isScreen));
+        voip.setVolume(mid, isScreen, 0);
+        btn.innerHTML = "🔇";
+    } else {
+        const prev = fsMuteCache.get(key);
+        fsMuteCache.delete(key);
+        voip.setVolume(mid, isScreen, prev == null ? 100 : prev);
+        btn.innerHTML = "🔊";
     }
 }
 

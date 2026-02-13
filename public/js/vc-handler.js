@@ -553,10 +553,9 @@ function leaveVC() {
     document.querySelectorAll("audio[id^='audio-global-']").forEach(el => el.remove());
 }
 
-function toggleScreenshare() {
+async function toggleScreenshare() {
     if (voip.isScreensharing) {
-        voip.stopScreenshare();
-        voip.isScreensharing = false;
+        await voip.stopScreenshare();
         return;
     }
 
@@ -589,10 +588,14 @@ function toggleScreenshare() {
         voip.setStreamSettings({
             resolution: document.getElementById("res").value,
             frameRate: parseInt(document.getElementById("fps").value),
-            bitrate: parseInt(document.getElementById("bit").value)
+            maxBitrate: parseInt(document.getElementById("bit").value),
         });
-        voip.shareScreen(true);
-        voip.isScreensharing = true;
+
+        try {
+            await voip.shareScreen(true);
+        } catch (e) {
+            console.error(e);
+        }
     }, ["Start", null], false, 400);
 }
 

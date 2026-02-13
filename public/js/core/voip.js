@@ -20,7 +20,95 @@ class VoIP {
 
         this._micPub = null;
 
+        this._screenPubs = [];
+        this._screenTracks = [];
+
         this.configureUrls();
+    }
+
+    async stopScreenshare() {
+        if (!this.room?.localParticipant) return;
+        const participantId = this.room.localParticipant.identity;
+
+        const pubs = this._screenPubs.length
+            ? [...this._screenPubs]
+            : Array.from(this.room.localParticipant.trackPublications.values()).filter(pub => {
+                const s = pub?.source;
+                return s === LivekitClient.Track.Source.ScreenShare || s === LivekitClient.Track.Source.ScreenShareAudio || s === "screen";
+            });
+
+        for (const pub of pubs) {
+            const track = pub?.track;
+            if (track) {
+                try { track.mediaStreamTrack?.stop?.(); } catch(e) {}
+                try { track.stop?.(); } catch(e) {}
+                try { this._cleanupDetachedEls(track.detach()); } catch(e) {}
+            }
+
+            try { await this.room.localParticipant.unpublishTrack(pub.trackSid); } catch(e) {}
+            try { if (track) await this.room.localParticipant.unpublishTrack(track); } catch(e) {}
+        }
+
+        for (const t of this._screenTracks) {
+            try { t.mediaStreamTrack?.stop?.(); } catch(e) {}
+            try { t.stop?.(); } catch(e) {}
+            try { this._cleanupDetachedEls(t.detach()); } catch(e) {}
+            try { await this.room.localParticipant.unpublishTrack(t); } catch(e) {}
+        }
+
+        this._screenPubs = [];
+        this._screenTracks = [];
+        this.isScreensharing = false;
+
+        if (this.onScreenshareEnd) this.onScreenshareEnd(participantId);
+    }
+
+    async shareScreen(includeAudio = false) {
+        if (!this.room?.localParticipant) return;
+
+        const participantId = this.room.localParticipant.identity;
+
+        await this.stopScreenshare().catch(()=>{});
+
+        let tracks = await this.room.localParticipant.createScreenTracks({
+            audio: includeAudio,
+            video: {
+                resolution: this.streamSettings.resolution,
+                frameRate: this.streamSettings.frameRate,
+                maxBitrate: this.streamSettings.maxBitrate,
+                codec: "h264"
+            },
+        });
+
+        this._screenTracks = tracks;
+
+        for (const track of tracks) {
+            let pub;
+            try {
+                if (track.kind === "video") {
+                    pub = await this.room.localParticipant.publishTrack(track, { source: LivekitClient.Track.Source.ScreenShare });
+                } else if (track.kind === "audio") {
+                    pub = await this.room.localParticipant.publishTrack(track, { source: LivekitClient.Track.Source.ScreenShareAudio });
+                } else {
+                    pub = await this.room.localParticipant.publishTrack(track);
+                }
+            } catch(e) {
+                pub = await this.room.localParticipant.publishTrack(track);
+            }
+
+            if (pub) this._screenPubs.push(pub);
+
+            try { this._cleanupDetachedEls(track.detach()); } catch(e) {}
+
+            if (this.onScreenshareBegin) this.onScreenshareBegin(participantId, track);
+            if (this.onTrackSubscribed) this.onTrackSubscribed(track, participantId, true);
+
+            track.on("ended", () => {
+                this.stopScreenshare().catch(()=>{});
+            });
+        }
+
+        this.isScreensharing = true;
     }
 
     configureUrls() {
@@ -133,60 +221,30 @@ class VoIP {
         if (maxBitrate) this.streamSettings.maxBitrate = maxBitrate;
     }
 
-    async stopScreenshare() {
-        if (!this.room?.localParticipant) return;
-        const participantId = this.room.localParticipant.identity;
+    _cleanupDetachedEls(detachedEls){
+        (detachedEls || []).forEach(el => {
+            if(!el) return;
 
-        this.room.localParticipant.trackPublications.forEach(pub => {
-            const track = pub.track;
-            if (!track) return;
+            if(el.tagName === "VIDEO"){
+                try { el.pause(); } catch(e) {}
+                try { el.srcObject = null; } catch(e) {}
+                el.style.display = "none";
+                return;
+            }
 
-            const src = pub.source ?? track.source;
-            const isScreen = src === LivekitClient.Track.Source.ScreenShare || src === "screen";
-            if (!isScreen) return;
-
-            this.room.localParticipant.unpublishTrack(track).catch(() => {});
-            track.detach().forEach(el => el.remove());
-            if (track.mediaStreamTrack) track.mediaStreamTrack.stop();
-            if (track.kind === "audio" && typeof track.stop === "function") track.stop();
+            if(el.tagName === "AUDIO"){
+                const id = el.id || "";
+                if(id.startsWith("audio-global-")){
+                    el.remove();
+                } else {
+                    try { el.pause(); } catch(e) {}
+                    try { el.srcObject = null; } catch(e) {}
+                }
+            }
         });
-
-        this.isScreensharing = false;
-        if (this.onScreenshareEnd) this.onScreenshareEnd(participantId);
     }
 
-    async shareScreen(includeAudio = false) {
-        if (!this.room?.localParticipant) return;
 
-        const participantId = this.room.localParticipant.identity;
-
-        const tracks = await this.room.localParticipant.createScreenTracks({
-            audio: includeAudio,
-            video: {
-                resolution: this.streamSettings.resolution,
-                frameRate: this.streamSettings.frameRate,
-                maxBitrate: this.streamSettings.maxBitrate,
-                codec: "h264"
-            },
-        });
-
-        for (const track of tracks) {
-            await this.room.localParticipant.publishTrack(track);
-
-            track.detach().forEach(el => el.pause());
-
-            if (this.onScreenshareBegin) this.onScreenshareBegin(participantId, track);
-            if (this.onTrackSubscribed) this.onTrackSubscribed(track, participantId, true);
-
-            track.on("ended", () => {
-                track.detach().forEach(el => el.remove());
-                this.room.localParticipant.unpublishTrack(track);
-                if (this.onScreenshareEnd) this.onScreenshareEnd(participantId);
-            });
-
-            this.isScreensharing = true;
-        }
-    }
 
     async getToken(roomName, participantName, memberId, channelId) {
         const response = await fetch(this.APPLICATION_SERVER_URL + "/token", {

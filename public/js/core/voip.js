@@ -76,13 +76,18 @@ class VoIP {
         await this.stopScreenshare().catch(()=>{});
 
         let tracks = await this.room.localParticipant.createScreenTracks({
-            audio: includeAudio,
+            audio: includeAudio ? {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+                voiceIsolation: false
+            } : false,
             video: {
                 resolution: this.streamSettings.resolution,
                 frameRate: this.streamSettings.frameRate,
                 maxBitrate: this.streamSettings.maxBitrate,
                 codec: "h264"
-            },
+            }
         });
 
         this._screenTracks = tracks;
@@ -146,7 +151,9 @@ class VoIP {
             audioCaptureDefaults: {
                 echoCancellation: false,
                 noiseSuppression: false,
-                autoGainControl: false
+                autoGainControl: false,
+                sampleRate: 48000,
+                voiceIsolation: false,
             }
         });
 
@@ -193,6 +200,7 @@ class VoIP {
             this._micPub = await this.room.localParticipant.setMicrophoneEnabled(true, {
                 echoCancellation: true,
                 noiseSuppression: true,
+                voiceIsolation: true,
                 autoGainControl: false
             });
 
@@ -367,6 +375,7 @@ class VoIP {
         await this.room.localParticipant.setMicrophoneEnabled(true, {
             echoCancellation: true,
             noiseSuppression: true,
+            voiceIsolation: true,
             autoGainControl: false
         }).catch(()=>{});
     }
@@ -382,6 +391,7 @@ class VoIP {
         await this.room.localParticipant.setMicrophoneEnabled(nextEnabled, {
             echoCancellation: true,
             noiseSuppression: true,
+            voiceIsolation: true,
             autoGainControl: false
         });
         return nextEnabled;

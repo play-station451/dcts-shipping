@@ -7,7 +7,7 @@ class VoIP {
         this.streamSettings = {
             resolution: "1920x1080",
             frameRate: 60,
-            maxBitrate: 5_000_000,
+            maxBitrate: 50_000_000,
         };
 
         this.onJoin = null;
@@ -24,6 +24,11 @@ class VoIP {
         this._screenTracks = [];
 
         this.configureUrls();
+
+        this._audioCtx = null;
+        this._audioNodes = new Map();
+        this._mediaElSources = new WeakMap();
+        this._volumes = new Map();
     }
 
     async stopScreenshare() {
@@ -129,13 +134,29 @@ class VoIP {
     async joinRoom(roomName, userName, memberId, channelId) {
         this.room = new LivekitClient.Room();
 
-        this.room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, _publication, participant) => {
-            const isScreen = track.source === "screen" || track.source === LivekitClient.Track.Source.ScreenShare;
+        this.room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+            const src = publication?.source ?? track?.source;
+            const isScreen =
+                src === LivekitClient.Track.Source.ScreenShare ||
+                src === LivekitClient.Track.Source.ScreenShareAudio ||
+                src === "screen";
 
             this.storeTrack(participant.identity, track, isScreen);
 
             if (isScreen && this.onScreenshareBegin) this.onScreenshareBegin(participant.identity, track);
             if (this.onTrackSubscribed) this.onTrackSubscribed(track, participant.identity, isScreen);
+        });
+
+        this.room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+            const src = publication?.source ?? track?.source;
+            const isScreen =
+                src === LivekitClient.Track.Source.ScreenShare ||
+                src === LivekitClient.Track.Source.ScreenShareAudio ||
+                src === "screen";
+
+            this.removeTrack(participant.identity, track, isScreen);
+
+            if (isScreen && this.onScreenshareEnd) this.onScreenshareEnd(participant.identity);
         });
 
         this.room.on(LivekitClient.RoomEvent.ActiveSpeakersChanged, (speakers) => {
@@ -147,14 +168,6 @@ class VoIP {
 
         this.room.on(LivekitClient.RoomEvent.ParticipantDisconnected, (participant) => {
             if (this.onLeave) this.onLeave(participant.identity);
-        });
-
-        this.room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, _publication, participant) => {
-            const isScreen = track.source === "screen" || track.source === LivekitClient.Track.Source.ScreenShare;
-
-            this.removeTrack(participant.identity, track, isScreen);
-
-            if (isScreen && this.onScreenshareEnd) this.onScreenshareEnd(participant.identity);
         });
 
         try {
@@ -244,6 +257,72 @@ class VoIP {
         });
     }
 
+    _audioKey(mid, isScreen) {
+        return `${mid}:${isScreen ? "screen" : "user"}`;
+    }
+
+    async ensureAudioCtx() {
+        if (!this._audioCtx) this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (this._audioCtx.state === "suspended") await this._audioCtx.resume().catch(()=>{});
+    }
+
+    setVolume(mid, isScreen, percent) {
+        const key = this._audioKey(mid, isScreen);
+        const p = Math.max(0, Math.min(400, Number(percent) || 0));
+        this._volumes.set(key, p);
+
+        const node = this._audioNodes.get(key);
+        if (node?.gain) node.gain.gain.value = p / 100;
+    }
+
+    async attachAudioEl(mid, isScreen, audioEl) {
+        await this.ensureAudioCtx();
+
+        const key = this._audioKey(mid, isScreen);
+
+        const old = this._audioNodes.get(key);
+        if (old?.gain) {
+            try { old.gain.disconnect(); } catch(e) {}
+        }
+
+        let src = this._mediaElSources.get(audioEl);
+        if (!src || src.context !== this._audioCtx) {
+            try { src?.disconnect?.(); } catch(e) {}
+
+            if (audioEl?.srcObject instanceof MediaStream) {
+                src = this._audioCtx.createMediaStreamSource(audioEl.srcObject);
+            } else {
+                src = this._audioCtx.createMediaElementSource(audioEl);
+            }
+
+            this._mediaElSources.set(audioEl, src);
+        }
+
+        const gain = this._audioCtx.createGain();
+        const p = this._volumes.get(key);
+        gain.gain.value = (p == null ? 100 : p) / 100;
+
+        src.connect(gain);
+        gain.connect(this._audioCtx.destination);
+
+        this._audioNodes.set(key, { src, gain, el: audioEl });
+    }
+
+
+    detachAudio(mid, isScreen) {
+        const key = this._audioKey(mid, isScreen);
+        const node = this._audioNodes.get(key);
+        if (!node) return;
+        try { node.gain.disconnect(); } catch(e) {}
+        try { node.src?.disconnect?.(); } catch(e) {}
+        this._audioNodes.delete(key);
+    }
+
+
+    getVolume(mid, isScreen) {
+        const key = this._audioKey(mid, isScreen);
+        return this._volumes.get(key) ?? 100;
+    }
 
 
     async getToken(roomName, participantName, memberId, channelId) {

@@ -10,6 +10,26 @@ let screenStartTs = {};
 let screenStreams = {};
 let pipLastStream = null;
 
+async function setVcVolume(mid, isScreen, percent){
+    const p = Math.max(0, Math.min(400, Number(percent) || 0));
+    voip.setVolume(mid, isScreen, p);
+
+    const audioId = `audio-global-${mid}${isScreen ? '-screen' : ''}`;
+    const el = document.getElementById(audioId);
+
+    if (el) el.volume = Math.max(0, Math.min(1, p / 100));
+
+    await voip.ensureAudioCtx().catch(()=>{});
+    if (el) await voip.attachAudioEl(mid, isScreen, el).catch(()=>{});
+}
+
+
+async function hookVcAudio(mid, isScreen, audioEl){
+    await voip.ensureAudioCtx().catch(()=>{});
+    await voip.attachAudioEl(mid, isScreen, audioEl).catch(()=>{});
+    voip.setVolume(mid, isScreen, voip.getVolume(mid, isScreen));
+}
+
 function pickLatestActiveScreenshare() {
     let bestId = null;
     let bestTs = 0;
@@ -79,15 +99,19 @@ function rebuildVcUiFromTracks(){
         if(p.audioTrack){
             const audioId = `audio-global-${memberId}`;
             document.getElementById(audioId)?.remove();
+
             const audio = p.audioTrack.attach();
             audio.id = audioId;
             audio.autoplay = true;
             audio.setAttribute("data-member-id", memberId);
             audio.muted = isDeafened || memberId === UserManager.getID();
             document.body.appendChild(audio);
+
+            hookVcAudio(memberId, false, audio);
         }
     });
 }
+
 
 document.addEventListener("DOMContentLoaded", async event => {
 
@@ -119,6 +143,9 @@ document.addEventListener("DOMContentLoaded", async event => {
         document.querySelectorAll(`[data-member-id="${participantId}"]`).forEach(e => e.remove());
         document.querySelectorAll(`audio[id^="audio-global-${participantId}"]`).forEach(a => a.remove());
 
+        voip.detachAudio(participantId, false);
+        voip.detachAudio(participantId, true);
+
         delete screenStartTs[participantId];
         delete screenStreams[participantId];
         if(participantId === lastScreenOwner){
@@ -127,6 +154,7 @@ document.addEventListener("DOMContentLoaded", async event => {
 
         emitVcMemberLeft(participantId);
     };
+
 
 
     voip.onTrackSubscribed = (track, participantId, isScreen) => {
@@ -142,6 +170,8 @@ document.addEventListener("DOMContentLoaded", async event => {
             audio.setAttribute("data-member-id", participantId);
             audio.muted = isDeafened || participantId === UserManager.getID();
             document.body.appendChild(audio);
+
+            hookVcAudio(participantId, isScreen === true, audio);
             return;
         }
 
@@ -176,6 +206,7 @@ document.addEventListener("DOMContentLoaded", async event => {
     };
 
 
+
     voip.onScreenshareBegin = (participantId) => {
         if (participantId === UserManager.getID()) return;
         screenStartTs[participantId] = Date.now();
@@ -184,6 +215,8 @@ document.addEventListener("DOMContentLoaded", async event => {
     voip.onScreenshareEnd = (participantId) => {
         document.querySelectorAll(`.vc-card[data-member-id="${participantId}"][data-type="screen"]`).forEach(e => e.remove());
         document.querySelectorAll(`audio[id^="audio-global-${participantId}-screen"]`).forEach(a => a.remove());
+
+        voip.detachAudio(participantId, true);
 
         delete screenStartTs[participantId];
         delete screenStreams[participantId];
@@ -221,6 +254,10 @@ document.addEventListener("DOMContentLoaded", async event => {
         if (mid) {
             document.querySelectorAll(`.vc-card[data-member-id="${mid}"]`).forEach(e => e.remove());
             document.querySelectorAll(`audio[id^="audio-global-${mid}"]`).forEach(e => e.remove());
+
+            voip.detachAudio(mid, false);
+            voip.detachAudio(mid, true);
+
             checkPipVisibility();
         }
     });
@@ -239,25 +276,38 @@ function getOrCreateUserCard(memberId, isScreen = false) {
     let card = document.getElementById(cardId);
     if (card) return card;
 
+    const vol = voip?.getVolume ? voip.getVolume(memberId, isScreen) : 100;
+
     let html = `
-        <div class="vc-card ${isScreen ? "screen-only" : ""}"
-             id="${cardId}"
-             data-member-id="${memberId}"
-             data-type="${type}"
-             onclick="openFullscreen('${memberId}', ${isScreen})">
-
-            ${isScreen ? "" : `
-                <div class="avatar-container">
-                    <img class="vc-avatar" src="/img/default_icon.png" data-member-id="${memberId}">
-                </div>
-            `}
-
-            <video autoplay playsinline muted style="display:none;"></video>
-
-            ${isScreen ? "" : `
-                <div class="username" data-member-id="${memberId}">User ${memberId}</div>
-            `}
+      <div class="vc-card ${isScreen ? "screen-only" : ""}"
+           id="${cardId}"
+           data-member-id="${memberId}"
+           data-type="${type}"
+           onclick="openFullscreen('${memberId}', ${isScreen})">
+    
+        ${isScreen ? "" : `
+          <div class="avatar-container">
+            <img class="vc-avatar" src="/img/default_icon.png" data-member-id="${memberId}">
+          </div>
+        `}
+    
+        <video autoplay playsinline muted style="display:none;"></video>
+    
+        <div class="vc-volwrap"
+             onmousedown="event.stopPropagation()"
+             onclick="event.stopPropagation()">
+          <input class="vc-vol" type="range" min="0" max="400" value="${vol}"
+            oninput="
+              setVcVolume('${memberId}', ${isScreen}, this.value);
+              this.nextElementSibling.innerText = this.value + '%';
+            ">
+          <div class="vc-volpct">${vol}%</div>
         </div>
+    
+        ${isScreen ? "" : `
+          <div class="username" data-member-id="${memberId}">User ${memberId}</div>
+        `}
+      </div>
     `;
 
     grid.insertAdjacentHTML("beforeend", html);
@@ -275,6 +325,7 @@ function getOrCreateUserCard(memberId, isScreen = false) {
 
     return card;
 }
+
 
 async function setupVC(roomId) {
     if (!roomId) return;
@@ -551,7 +602,11 @@ function leaveVC() {
     let pip = document.getElementById("vc-pip-overlay");
     if (pip) pip.style.display = "none";
     document.querySelectorAll("audio[id^='audio-global-']").forEach(el => el.remove());
+
+    voip.detachAudio(UserManager.getID(), false);
+    voip.detachAudio(UserManager.getID(), true);
 }
+
 
 async function toggleScreenshare() {
     if (voip.isScreensharing) {

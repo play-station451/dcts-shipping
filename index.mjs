@@ -441,7 +441,6 @@ const tables = [
         columns: [
             {name: "rowId", type: "int(12) NOT NULL AUTO_INCREMENT PRIMARY KEY"},
             {name: "identifier", type: "varchar(255) NOT NULL"},
-            {name: "type", type: "varchar(255) NOT NULL"},
             {name: "data", type: "longtext NOT NULL"},
             {name: "last_update", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"}
         ],

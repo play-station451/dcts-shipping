@@ -280,11 +280,8 @@ import {
 import {migrateOldMessagesToNewMessageSystemWithoutEncoding} from "./modules/functions/migrations/messageMigration.mjs";
 import JSONTools from "@hackthedev/json-tools";
 import {initPaymentSystem, paymentConfig} from "./modules/functions/payments.mjs";
-<<<<<<< Updated upstream
-=======
 import {emitErrorToTestingClient} from "./modules/sockets/onErrorTesting.mjs";
 import {getCache, setCache} from "./modules/functions/ip-cache.mjs";
->>>>>>> Stashed changes
 
 /*
     Files for the plugin system
@@ -444,7 +441,6 @@ const tables = [
         columns: [
             {name: "rowId", type: "int(12) NOT NULL AUTO_INCREMENT PRIMARY KEY"},
             {name: "identifier", type: "varchar(255) NOT NULL"},
-            {name: "type", type: "varchar(255) NOT NULL"},
             {name: "data", type: "longtext NOT NULL"},
             {name: "last_update", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"}
         ],
@@ -822,14 +818,18 @@ server = http.createServer(app)
 process.on("uncaughtException", function (err) {
     // Handle the error safely
     Logger.error("UNEXPECTED ERROR");
-    Logger.error(err.message);
-    Logger.error("Details: ");
-    Logger.error(err.stack);
+    //Logger.error(err.message);
+    //Logger.error("Details: ");
+    Logger.error(err);
+
+    emitErrorToTestingClient(err)
 });
 
 process.on("unhandledRejection", (reason) => {
     Logger.error("UNHANDLED PROMISE REJECTION");
-    Logger.error(reason?.stack || reason);
+    Logger.error(reason);
+
+    emitErrorToTestingClient(reason)
 });
 
 

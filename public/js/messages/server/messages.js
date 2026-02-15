@@ -266,7 +266,6 @@ document.addEventListener("DOMContentLoaded", function () {
         editElement.innerHTML= sanitizeHtmlForRender(convertedMentions.text)
 
         editElement.innerHTML += getMessageEditedHTML(message);
-        editElement.innerHTML += sanitizeHtmlForRender(getMessageEditedHTML(message));
         editElement.innerHTML += createMsgActions(message.messageId);
     });
 })

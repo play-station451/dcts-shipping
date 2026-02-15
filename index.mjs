@@ -443,7 +443,8 @@ const tables = [
             {name: "identifier", type: "varchar(255) NOT NULL"},
             {name: "type", type: "varchar(255) NOT NULL"},
             {name: "data", type: "longtext NOT NULL"},
-            {name: "last_update", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"}
+            {name: "last_update", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"},
+            {name: "created", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"}
         ],
         keys: [
             {name: "UNIQUE KEY", type: "identifier (identifier)"}

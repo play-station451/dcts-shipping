@@ -399,7 +399,7 @@ const processPlugins = async () => {
 // SQL Database Structure needed
 // it will create everything if missing (except database)
 // +1 convenience
-const tables = [
+const xxxx = [
     {
         name: "messages",
         columns: [
@@ -901,18 +901,35 @@ export const io = new Server(server, {
     },
 });
 
-(async () => {
-    for (const table of tables) {
-        await db.checkAndCreateTable(table);
-    }
+const criticalTables = ["members", "messages", "cache", "migrations", "message_logs", "reports"];
 
+async function waitForTable(table, interval = 1000) {
+    while (true) {
+        try {
+            await queryDatabase(`SELECT 1 FROM ?? LIMIT 1`, [table]);
+            console.log(`${table} exists`);
+            return; // exit the loop once the table exists
+        } catch (err) {
+            console.log(`${table} does not exist yet, retrying...`);
+            await new Promise(resolve => setTimeout(resolve, interval)); // wait before retry
+        }
+    }
+}
+
+(async () => {
+    await db.waitForConnection();
+
+    for (const t of criticalTables) {
+        await waitForTable(t);
+    }
+    
+    await checkMigrations();
     await loadMembersFromDB();
 
     // after the tables exist etc we will fire up our awesome new job(s)
     scheduleDbTasks(dbTasks);
 
-    await checkMigrations();
-    await ipsec.filterExpressTraffic(app)
+    ipsec.filterExpressTraffic(app)
 
     let libDir = path.join(path.resolve(), "public", "js", "libs");
     const results = await FrontendLibs.installMultiple([

@@ -19,3 +19,5 @@ privatekey.json
 dcts/configs/config.json
 dcts/configs/payments.json
 dcts/plugins/settings.json
+Private_Certs/certificate.pem
+Private_Certs/private.pem

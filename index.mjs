@@ -10,6 +10,7 @@ import https from "https";
 import http from "http";
 import fs from "fs";
 import fse from "fs-extra"; // Use fs-extra for easy directory copying
+import yaml from 'js-yaml';
 import path from "path";
 import sanitizeHtml from "sanitize-html";
 import bcrypt from "bcrypt";

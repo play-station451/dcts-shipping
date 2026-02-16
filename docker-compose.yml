@@ -24,6 +24,7 @@ services:
       - ./dcts/emojis:/app/public/emojis
       - ./dcts/plugins:/app/plugins
       - ./dcts/public/css/themes:/app/themes 
+      - ./livekit.yaml:/etc/livekit.yaml
 
   dcts-mariadb:
     image: mariadb:latest

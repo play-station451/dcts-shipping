@@ -794,6 +794,22 @@ export function findInJson(obj, keyToFind, valueToFind, returnPath = false) {
     return returnPath ? foundPath : result;
 }
 
+export function formatDateTimeForMySQL(date) {
+    if (!(date instanceof Date)) {
+        throw new Error("Invalid date: Please pass a valid Date object.");
+    }
+
+    const pad = (n) => n.toString().padStart(2, "0");
+
+    return (
+        date.getFullYear() + "-" +
+        pad(date.getMonth() + 1) + "-" +
+        pad(date.getDate()) + " " +
+        pad(date.getHours()) + ":" +
+        pad(date.getMinutes()) + ":" +
+        pad(date.getSeconds())
+    );
+}
 
 export function formatDateTime(date) {
     if (!(date instanceof Date)) {

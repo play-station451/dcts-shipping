@@ -1,4 +1,5 @@
 import {db} from "../../index.mjs";
+import { formatDateTimeForMySQL } from "./chat/main.mjs";
 
 export async function getCache(identifier, type) {
     if (!identifier) throw new Error("identifier not supplied.");
@@ -30,6 +31,6 @@ export async function setCache(identifier, type, data) {
             data = VALUES(data),
             created = VALUES(created)
         `,
-        [identifier, type, data, Date.now()]
+        [identifier, type, data, formatDateTimeForMySQL(Date.now())]
     );
 }

@@ -1051,6 +1051,13 @@ export function generateId(length) {
 }
 
 export function validateMemberId(id, socket, token, bypass = false) {
+    console.log("Validating member:", {
+        providedId: id,
+        socketUser: socket.user,
+        token: token
+    });
+
+
     id = String(id)
 
     if (bypass === false && socket) {

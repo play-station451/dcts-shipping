@@ -21,3 +21,4 @@ dcts/configs/payments.json
 dcts/plugins/settings.json
 Private_Certs/certificate.pem
 Private_Certs/private.pem
+dcts/configs/emojis.json

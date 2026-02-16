@@ -1,6 +1,6 @@
 services:
   dcts-app:
-    build: ./
+    image: ghcr.io/hackthedev/dcts-shipping:beta
     depends_on:
       dcts-mariadb:
         condition: service_healthy
@@ -13,9 +13,9 @@ services:
       - DB_USER=dcts
       - DB_PASS=dcts
       - DB_NAME=dcts
-      - LIVEKIT_URL=lk.wunadacat.com
+      - LIVEKIT_URL=livekit.example.com #change this
       - LIVEKIT_YAML_PATH=/etc/livekit.yaml
-      - DEBUG=true # optional
+      - DEBUG=false # optional
     restart: unless-stopped
     volumes:
       - ./dcts/sv:/app/sv

@@ -1,5 +1,7 @@
-lk.wunadacat.com {
-    tls /etc/caddy/certs/certificate.pem /etc/caddy/certs/private.pem
+#change this to your domain for where livekit is going to live
+livekit.example.com {
+    #For setting your own cert
+    #tls /etc/caddy/certs/certificate.pem /etc/caddy/certs/private.pem
 
     encode gzip zstd
 
@@ -18,8 +20,10 @@ lk.wunadacat.com {
     }
 }
 
-chat.wunadacat.com {
-    tls /etc/caddy/certs/certificate.pem /etc/caddy/certs/private.pem
+#change this to your domain for the webui to live
+example.com {
+    #For setting your own cert
+    #tls /etc/caddy/certs/certificate.pem /etc/caddy/certs/private.pem
 
     encode gzip zstd
 

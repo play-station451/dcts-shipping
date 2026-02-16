@@ -185,17 +185,6 @@ export let db = new dSyncSql({
     connectionLimit: serverconfig.serverinfo.sql.connectionLimit,
     queueLimit: 0,
 });
-
-Logger.info("Checking and waiting for database connection...");
-Logger.info("If it takes too long check the data inside the config.json file");
-Logger.info("and make sure the database is running and accessible.");
-await db.waitForConnection();
-Logger.success("Connection established!");
-Logger.space();
-
-// backup members from config file
-await checkMemberMigration();
-
 // Import functions etc from files (= better organisation)
 // Special thanks to Kannustin <3
 
@@ -444,7 +433,8 @@ const xxxx = [
             {name: "identifier", type: "varchar(255) NOT NULL"},
             {name: "type", type: "varchar(255) NOT NULL"},
             {name: "data", type: "longtext NOT NULL"},
-            {name: "last_update", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"}
+            {name: "last_update", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"},
+            {name: "created", type: "bigint NOT NULL DEFAULT (UNIX_TIMESTAMP() * 1000)"}
         ],
         keys: [
             {name: "UNIQUE KEY", type: "identifier (identifier)"}
@@ -815,6 +805,18 @@ if (checkVer != null) {
 
 // Check if SSL is used or not
 server = http.createServer(app)
+io = new Server(server, {
+    maxHttpBufferSize: 1e8,
+    secure: true,
+    pingInterval: 25000,
+    pingTimeout: 60000,
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+        credentials: false,
+    },
+});
+
 
 // Catch uncaught errors
 process.on("uncaughtException", function (err) {
@@ -923,7 +925,15 @@ async function waitForTable(table, interval = 1000) {
 
 
 (async () => {
+    Logger.info("Checking and waiting for database connection...");
+    Logger.info("If it takes too long check the data inside the config.json file");
+    Logger.info("and make sure the database is running and accessible.");
     await db.waitForConnection();
+    Logger.success("Connection established!");
+    Logger.space();
+
+    // backup members from config file
+    await checkMemberMigration();
 
     for (const t of criticalTables) {
         await waitForTable(t);
@@ -957,8 +967,39 @@ async function waitForTable(table, interval = 1000) {
     listenToIO();
 })();
 
+async function initIPSec(){
+    ipsec = new dSyncIPSec({
+        checkCache: async (ip) => {
+            let ipInfoRow = await getCache(ip, "ip_cache");
+            if(ipInfoRow?.length === 0){
+                await setCache(ip, "ip_cache");
+            }
+        },
+        setCache: async (ip, data) => {
+            await setCache(ip, "ip_cache", JSON.stringify(data));
+        }
+    });
+    ipsec.updateRule({
+        blockBogon: serverconfig.serverinfo.moderation.ip.blockBogon,
+        blockSatelite: serverconfig.serverinfo.moderation.ip.blockSatelite,
+        blockCrawler: serverconfig.serverinfo.moderation.ip.blockCrawler,
+        blockProxy: serverconfig.serverinfo.moderation.ip.blockProxy,
+        blockVPN: serverconfig.serverinfo.moderation.ip.blockVPN,
+        blockTor: serverconfig.serverinfo.moderation.ip.blockTor,
+        blockAbuser: serverconfig.serverinfo.moderation.ip.blockAbuser,
 
-export function startServer() {
+        whitelistedUrls: serverconfig.serverinfo.moderation.ip.urlWhitelist,
+        whitelistedIps: serverconfig.serverinfo.moderation.ip.whitelist,
+        blacklistedIps: serverconfig.serverinfo.moderation.ip.blacklist,
+        companyDomainWhitelist: serverconfig.serverinfo.moderation.ip.companyDomainWhitelist,
+    });
+
+    await ipsec.filterExpressTraffic(app)
+}
+
+export async function startServer() {
+    initIPSec();
+
     // Start the app server
     var port = process.env.PORT || serverconfig.serverinfo.port;
     server.listen(port, function () {

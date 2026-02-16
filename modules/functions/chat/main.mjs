@@ -1,7 +1,7 @@
 /*
     The functions here are basically the "core" of the chat app on the server side.
  */
-import {serverconfig, xssFilters, colors, saveConfig, usersocket, server} from "../../../index.mjs"
+import {serverconfig, xssFilters, colors, saveConfig, usersocket, server, ipsec} from "../../../index.mjs"
 import {io} from "../../../index.mjs";
 import {getMemberHighestRole} from "./helper.mjs";
 import {
@@ -328,27 +328,7 @@ export async function updateIpCache(ip, data){
 }
 
 export async function lookupIP(ip){
-    if(!ip) return {error: "No IP provided"};
-
-    let ipCache = await checkIpCache(ip);
-
-    // cache not found, fetch and cache
-    if(!ipCache){
-        // we only return if its not found so i can have debug data for localhost ips
-        if(isLocalhostIp(ip)) return {error: `IP ${ip} was local.`};
-        let ipRequest = await fetch(`https://api.ipapi.is/?q=${ip}`);
-        if(ipRequest.status === 200){
-            let ipData = await ipRequest.json();
-            await updateIpCache(ip, ipData);
-            return ipData;
-        }
-        else{
-            return {error: "Failed to fetch IP data"};
-        }
-    }
-    else{
-        return JSON.parse(ipCache.data);
-    }
+    return await ipsec.lookupIP(ip)
 }
 
 export async function getMemberIpInfo(socket){

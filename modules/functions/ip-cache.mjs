@@ -29,8 +29,8 @@ export async function setCache(identifier, type, data) {
         VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
             data = VALUES(data),
-            created = VALUES(created)
+            created = NOW
         `,
-        [identifier, type, data, formatDateTimeForMySQL(Date.now())]
+        [identifier, type, data]
     );
 }

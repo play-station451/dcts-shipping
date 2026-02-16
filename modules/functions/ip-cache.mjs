@@ -29,7 +29,7 @@ export async function setCache(identifier, type, data) {
         VALUES (?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
             data = VALUES(data),
-            created = NOW
+            created = NOW()
         `,
         [identifier, type, data]
     );

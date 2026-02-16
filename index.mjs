@@ -805,7 +805,7 @@ if (checkVer != null) {
 
 // Check if SSL is used or not
 server = http.createServer(app)
-io = new Server(server, {
+export const io = new Server(server, {
     maxHttpBufferSize: 1e8,
     secure: true,
     pingInterval: 25000,
@@ -889,18 +889,6 @@ ipsec.updateRule({
     whitelistedIps: serverconfig.serverinfo.moderation.ip.whitelist,
     blacklistedIps: serverconfig.serverinfo.moderation.ip.blacklist,
     companyDomainWhitelist: serverconfig.serverinfo.moderation.ip.companyDomainWhitelist,
-});
-
-export const io = new Server(server, {
-    maxHttpBufferSize: 1e8,
-    secure: true,
-    pingInterval: 25000,
-    pingTimeout: 60000,
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
-        credentials: false,
-    },
 });
 
 const criticalTables = ["members", "messages", "cache", "migrations", "message_logs", "reports"];

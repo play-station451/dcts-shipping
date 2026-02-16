@@ -10,6 +10,7 @@ import dSyncShop from '@hackthedev/dsync-shop';
 import {db} from "../../index.mjs";
 import express from "express";
 import {validateMemberId} from "./main.mjs";
+import {hasPermission} from "./chat/main.mjs";
 
 export let paymentConfig = {}
 let paymentConfigPath = path.join(path.resolve(), "configs", "payments.json")
@@ -68,7 +69,7 @@ export function initPaymentSystem(app){
             const userId = req.headers['x-user-id'];
             if (!token || !userId) return false
 
-            return validateMemberId(userId, null, token);
+            return validateMemberId(userId, null, token) && hasPermission(userId, "manageShop");
         },
         enrichMetadata: async (req) => {
             const token = req.headers['x-token'];

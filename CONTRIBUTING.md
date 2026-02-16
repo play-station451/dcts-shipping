@@ -2,8 +2,22 @@
 
 First off, thanks for taking the time to contribute! 
 
-There are 
+There are many ways on how to contribute to the project. You can contribute by improving the code or [fixing issues](https://github.com/hackthedev/dcts-shipping/issues), spreading the word about the project, helping test new updates, [donating](https://ko-fi.com/shydevil) and more!
 
 > [!IMPORTANT]
 >
 > When contributing to this project, you must agree that you have authored 100% of the content, that you have the necessary rights to the content and that the content is being owned by the project's creator and can be used in any way.
+
+> [!NOTE]
+>
+> PRs and issues made by AI will likely be rejected, tho using it to point out possible bugs and security concerns is absolutely welcome! I just dont want PRs etc to be "vibe coded" entirely, especially since programming is a lot of fun :)
+
+------
+
+## Design Philosophy
+
+In order to best contribute to DCTS in form of code its important to understand how DCTS is being developed and the goals behind it. 
+
+1. DCTS is avoiding as many 3rd party libraries as possible with the goal to be as independent as possible. A lot of libraries are custom-made to provide long term stability as DCTS was made with the intent to exist for a long time to come.
+2. Keep everything as simple as possible. This includes code as well as UI flows. ***Everything*** should be as simple and intuitive as possible and avoid over-engineering.
+3. AI usage to write anything more than maybe an function should be avoided as such code can be a pain to maintain etc

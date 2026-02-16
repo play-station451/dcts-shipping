@@ -135,8 +135,6 @@ class ChatManager {
                 return "";
             }
 
-            console.log(themeMeta)
-
             return `
                 <div class="theme-entry" data-theme="${theme}">
                     <div class="thumbnail-container">

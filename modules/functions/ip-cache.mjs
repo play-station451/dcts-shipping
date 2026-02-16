@@ -28,7 +28,7 @@ export async function setCache(identifier, type, data) {
         INSERT INTO cache (identifier, type, data)
         VALUES (?, ?, ?)
         ON DUPLICATE KEY UPDATE
-            data = VALUES(data),
+            data = VALUES(data)
         `,
         [identifier, type, data]
     );

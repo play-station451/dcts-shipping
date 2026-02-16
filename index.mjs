@@ -124,7 +124,16 @@ checkFile("./plugins/settings.json", true, "{}");
  */
 
 export var serverconfig = fs.existsSync(configPath) ? JSONTools.tryParse(fs.readFileSync(configPath, {encoding: "utf-8"})) : {};
-checkConfigAdditions();
+
+const fileContents = fs.readFileSync(process.env.LIVEKIT_YAML_PATH, 'utf8');
+const data = yaml.load(fileContents);
+
+const firstEntry = Object.entries(data.keys || {})[0];
+
+const API_KEY = firstEntry?.[0]
+const API_SECRET = firstEntry?.[1]
+const LIVEKIT_URL = process.env.LIVEKIT_URL
+checkConfigAdditions(API_KEY, API_SECRET, LIVEKIT_URL);
 
 
 // made by installer script
@@ -991,22 +1000,7 @@ export function startServer() {
     });
 }
 
-const fileContents = fs.readFileSync(process.env.LIVEKIT_YAML_PATH, 'utf8');
-const data = yaml.load(fileContents);
-
-const firstEntry = Object.entries(data.keys || {})[0];
-
-const API_KEY = firstEntry?.[0] || serverconfig.serverinfo.livekit.key;
-const API_SECRET = firstEntry?.[1] || serverconfig.serverinfo.livekit.secret;
-
-console.log("LIVEKIT_YAML_PATH:", process.env.LIVEKIT_YAML_PATH);
-console.log("YAML keys loaded:", data.keys);
-console.log("First entry from YAML:", firstEntry);
-
-console.log("API_KEY:", API_KEY);
-console.log("API_SECRET:", API_SECRET);
-
-const webhookReceiver = new WebhookReceiver(API_KEY, API_SECRET);
+const webhookReceiver = new WebhookReceiver(serverconfig.serverinfo.livekit.key, serverconfig.serverinfo.livekit.secret);
 
 app.post("/token", async (req, res) => {
     const {roomName, participantName, memberId, channelId} = req.body;
@@ -1023,7 +1017,7 @@ app.post("/token", async (req, res) => {
         return;
     }
 
-    const at = new AccessToken(API_KEY, API_SECRET, {
+    const at = new AccessToken(serverconfig.serverinfo.livekit.key, API_SECRET, {
         identity: participantName,
     });
     at.addGrant({roomJoin: true, room: roomName});

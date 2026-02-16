@@ -20,4 +20,4 @@ In order to best contribute to DCTS in form of code its important to understand 
 
 1. DCTS is avoiding as many 3rd party libraries as possible with the goal to be as independent as possible. A lot of libraries are custom-made to provide long term stability as DCTS was made with the intent to exist for a long time to come.
 2. Keep everything as simple as possible. This includes code as well as UI flows. ***Everything*** should be as simple and intuitive as possible and avoid over-engineering.
-3. 
+3. AI usage to write anything more than maybe an function should be avoided as such code can be a pain to maintain etc

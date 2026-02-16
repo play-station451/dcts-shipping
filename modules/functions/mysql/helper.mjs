@@ -3,6 +3,7 @@ import {XMLHttpRequest, fetch, serverconfig} from "../../../index.mjs";
 import Logger from "@hackthedev/terminal-logger"
 import fs from "fs";
 import {spawn} from "child_process";
+import { formatDateTimeForMySQL } from "../chat/main.mjs";
 
 
 export async function exportDatabaseFromPool(pool, outFile) {
@@ -32,7 +33,24 @@ export async function saveMemberToDB(id, data) {
     if (!data || typeof data !== "object" || !id) return console.log("[saveMemberToDB] invalid data", data);
 
     const cols = Object.keys(data);
-    const vals = Object.values(data);
+    const vals = Object.values(data).map((v, i) => {
+        const col = cols[i];
+
+        // Convert any timestamp fields to MySQL DATETIME
+        if ((col === "joined" || col === "created") && v != null) {
+            let date;
+            if (typeof v === "number") {
+                date = new Date(v);
+            } else if (v instanceof Date) {
+                date = v;
+            } else {
+                return v;
+            }
+            return formatDateTimeForMySQL(date);
+        }
+
+        return v;
+    });
     const placeholders = cols.map(() => "?").join(",");
 
     const sql = `

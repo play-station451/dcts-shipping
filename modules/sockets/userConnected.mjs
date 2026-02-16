@@ -62,11 +62,17 @@ function truncateText(text, length) {
 function handleInviteCode(member, socket, response) {
     // handle user registration and invite only things.
     // if a member was on the server already he wont be prompted for codes.
+
     if (
-        serverconfig.serverinfo.registration.enabled === false &&
-        !serverconfig.servermembers[member?.id]
+        serverconfig.serverinfo.registration.enabled === false
+        && serverconfig.servermembers[member?.id]?.onboarding === false
     ) {
         if (!member?.code) {
+            // to be extra sure, remove users from the pow verified array
+            // so that if they try to fetch data like member list etc
+            // it'll automatically be denied
+            removeFromArray(powVerifiedUsers, socket.id);
+
             response({
                 error: `Registration is disabled on this server.<br>
                         You need to provide an access code`,
@@ -74,12 +80,9 @@ function handleInviteCode(member, socket, response) {
                 registration: serverconfig.serverinfo.registration.enabled,
             });
 
-            // to be extra sure, remove users from the pow verified array
-            // so that if they try to fetch data like member list etc
-            // it'll automatically be denied
-            removeFromArray(powVerifiedUsers, socket.id);
             return false;
         }
+
         // code was correct, so lets process its properties
         if (serverconfig.serverinfo.registration.accessCodes[member.code]) {
             let code = serverconfig.serverinfo.registration.accessCodes[member.code];
@@ -301,10 +304,10 @@ export default (io) => (socket) => {
                 !serverconfig.servermembers[member.id] ||
                 serverconfig.servermembers[member.id]?.onboarding === false
             ) {
+                if(!member?.name) member.name = "Arnold"
+
                 // New Member joined the server
                 Logger.debug("New member connected");
-                Logger.debug(!serverconfig.servermembers[member.id]);
-                Logger.debug(serverconfig.servermembers[member.id]?.onboarding);
 
                 // handle onboarding
                 if (member?.onboarding === false) {
@@ -319,6 +322,9 @@ export default (io) => (socket) => {
                     Logger.debug("missing onboarding");
                     return;
                 }
+
+                // error if no password passed
+                if(!member?.password) return response({error: "Missing password field in plaintext"})
 
                 var userToken = generateId(48);
                 member.token = userToken;
@@ -378,26 +384,24 @@ export default (io) => (socket) => {
                 try {
                     sendMessageToUser(
                         socket.id,
-                        JSON.parse(
-                            `{
-                            "title": "Welcome ${serverconfig.servermembers[member.id].name} <3",
-                            "message": "",
-                            "buttons": {
-                                "0": {
-                                    "text": "Saved!",
-                                    "events": "refreshValues()"
+                        {
+                            title: `Welcome ${serverconfig.servermembers[member.id].name} <3`,
+                            message: "",
+                            buttons: {
+                                0: {
+                                    text: "Saved!",
+                                    events: "refreshValues()"
                                 }
                             },
-                            "action": "register",
-                            "token": "${serverconfig.servermembers[member.id].token}",
-                            "icon": "${serverconfig.servermembers[member.id].icon}",
-                            "banner": "${serverconfig.servermembers[member.id].banner}",
-                            "status": "${serverconfig.servermembers[member.id].status || ""}",
-                            "aboutme": "${serverconfig.servermembers[member.id].aboutme || ""}",
-                            "loginName": "${serverconfig.servermembers[member.id].loginName}",
-                            "type": "success"
-                        }`,
-                        ),
+                            action: "register",
+                            token: serverconfig.servermembers[member.id].token,
+                            icon: serverconfig.servermembers[member.id].icon,
+                            banner: serverconfig.servermembers[member.id].banner,
+                            status: serverconfig.servermembers[member.id].status || "",
+                            aboutme: serverconfig.servermembers[member.id].aboutme || "",
+                            loginName: serverconfig.servermembers[member.id].loginName,
+                            type: "success"
+                        }
                     );
 
                     // if a new member joins lets send a system welcome DM.

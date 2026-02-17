@@ -35,7 +35,6 @@ services:
       - MARIADB_PASSWORD=dcts
     volumes:
       - dcts-mariadb-data:/var/lib/mysql
-      - ./db:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       start_period: 10s
@@ -83,3 +82,4 @@ volumes:
   dcts-redis-data:
   caddy_data:
   caddy_config:
+

@@ -21,3 +21,4 @@ privatekey.json
 /Private_Certs/
 
 /config.env
+/livekit.yaml

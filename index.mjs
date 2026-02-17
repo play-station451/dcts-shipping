@@ -10,6 +10,7 @@ import https from "https";
 import http from "http";
 import fs from "fs";
 import fse from "fs-extra"; // Use fs-extra for easy directory copying
+import yaml from 'js-yaml';
 import path from "path";
 import sanitizeHtml from "sanitize-html";
 import bcrypt from "bcrypt";
@@ -866,9 +867,28 @@ app.use(
         maxAge: 0,
     })
 );
+const criticalTables = ["members", "messages", "cache", "migrations", "message_logs", "reports"];
+
+async function waitForTable(table, interval = 1000) {
+    while (true) {
+        const result = await queryDatabase(
+            `SELECT TABLE_NAME FROM information_schema.tables 
+             WHERE table_schema = DATABASE() AND table_name = ?`,
+            [table]
+        );
+
+        if (result.length) {
+            console.log(`${table} exists`);
+            return;
+        }
+
+        console.log(`${table} does not exist yet, retrying...`);
+        await new Promise(resolve => setTimeout(resolve, interval));
+    }
+}
+
 
 (async () => {
-
     Logger.info("Checking and waiting for database connection...");
     Logger.info("If it takes too long check the data inside the config.json file");
     Logger.info("and make sure the database is running and accessible.");
@@ -876,19 +896,22 @@ app.use(
     Logger.success("Connection established!");
     Logger.space();
 
-    // backup members from config file
-    await checkMemberMigration();
-
     for (const table of tables) {
         await db.checkAndCreateTable(table);
     }
+    
+    for (const t of criticalTables) {
+        await waitForTable(t);
+    }
 
+    // backup members from config file
+    await checkMemberMigration();
+
+    await checkMigrations();
     await loadMembersFromDB();
 
     // after the tables exist etc we will fire up our awesome new job(s)
     scheduleDbTasks(dbTasks);
-
-    await checkMigrations();
 
     let libDir = path.join(path.resolve(), "public", "js", "libs");
     const results = await FrontendLibs.installMultiple([
@@ -983,9 +1006,28 @@ export async function startServer() {
     });
 }
 
-const API_KEY = process.env.LIVEKIT_KEY || serverconfig.serverinfo.livekit.key;
-const API_SECRET =
-    process.env.LIVEKIT_SECRET || serverconfig.serverinfo.livekit.secret;
+const path = process.env.LIVEKIT_YAML_PATH || "./livekit.yaml";
+
+if (!fs.existsSync(path)) {
+    throw new Error(`LiveKit config file not found at: ${path}`);
+    process.exit(0);
+}
+
+const fileContents = fs.readFileSync(path, "utf8");
+
+const data = yaml.load(fileContents);
+
+const firstEntry = Object.entries(data.keys || {})[0];
+
+
+
+const API_KEY = firstEntry?.[0] || serverconfig.serverinfo.livekit.key;
+const API_SECRET = firstEntry?.[1] || serverconfig.serverinfo.livekit.secret;
+
+serverconfig.serverinfo.livekit.key = API_KEY;
+serverconfig.serverinfo.livekit.secret = API_SECRET;
+
+await saveConfig(serverconfig);
 
 const webhookReceiver = new WebhookReceiver(API_KEY, API_SECRET);
 

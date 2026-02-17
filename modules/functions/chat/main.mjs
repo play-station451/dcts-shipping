@@ -774,7 +774,6 @@ export function findInJson(obj, keyToFind, valueToFind, returnPath = false) {
     return returnPath ? foundPath : result;
 }
 
-
 export function formatDateTime(date) {
     if (!(date instanceof Date)) {
         throw new Error("Invalid date: Please pass a valid Date object.");

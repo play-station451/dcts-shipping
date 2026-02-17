@@ -14,11 +14,6 @@ if ! grep -q "^keys:" "${LIVEKIT_YAML_PATH}" 2>/dev/null; then
         exit 1
     fi
 
-    yq -i '
-      .keys = {} |
-      .keys["'"$API_KEY"'"] = "'"$API_SECRET"'"
-    ' "${LIVEKIT_YAML_PATH}"
-
     echo "Keys written."
 else
     echo "Keys already exist."
@@ -39,11 +34,29 @@ else
     echo "API keys already exist in $ENV_FILE"
 fi
 
-#livekit.yaml creation
-if [ ! -f "${LIVEKIT_YAML_PATH}" ]; then
-  echo "Creating base LiveKit config..."
+# Check if the file exists first
+if [ -f "${LIVEKIT_YAML_PATH}" ]; then
+    # Count the number of lines
+    line_count=$(wc -l < "${LIVEKIT_YAML_PATH}")
+    
+    if [ "$line_count" -le 1 ]; then
+        echo "File exists but has 1 or 0 lines, skipping..."
+        # You can use 'continue' in a loop or 'exit' depending on context
+        next  # replace 'next' with your actual command
+    else
+        echo "File exists and has more than one line, processing..."
+        # your processing logic here
+    fi
+else
+    echo "File does not exist, skipping..."
+    next  # again, replace with your actual command
+fi
 
-  cat <<EOF > "${LIVEKIT_YAML_PATH}"
+
+#livekit.yaml creation
+echo "Creating base LiveKit config..."
+
+cat <<EOF > "${LIVEKIT_YAML_PATH}"
 port: 7880
 rtc:
   tcp_port: 7881
@@ -63,6 +76,8 @@ turn:
   udp_port: 3478
   external_tls: true
 keys:
-  ${API_KEY}:${API_SECRET}
+  $API_KEY:$API_SECRET
 EOF
-fi
+
+
+exec /livekit-server --config "${LIVEKIT_YAML_PATH}"

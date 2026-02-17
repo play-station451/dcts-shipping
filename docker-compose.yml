@@ -1,24 +1,32 @@
 services:
-  init:
-    image: alpine:latest
-    working_dir: /workspace
+  dcts-livekit:
+    image: livekit/livekit-server:latest 
+    
+    env_file:
+      - config.env
+    entrypoint: sh -c "/initialize.sh"
     volumes:
-      - ./:/workspace
-    environment:
-      - LIVEKIT_URL=lk.wunadacat.com
-    command: sh -c "./startup-files/initialize.sh"
+      - ./config.env:/config.env
+      - ./startup-files/initialize.sh:/initialize.sh
+      - ./livekit.yaml:/etc/livekit.yaml
+    ports:
+      - 7881:7881
+      - 7882:7882/udp
+      - 3478:3478/udp
+      - 5349:5349/tcp
+    restart: unless-stopped
 
   dcts-app:
-    image: ghcr.io/hackthedev/dcts-shipping:beta
+    build: ./
     depends_on:
-      init:
-        condition: service_completed_successfully
       dcts-mariadb:
         condition: service_healthy
       dcts-redis:
         condition: service_healthy
       dcts-livekit:
         condition: service_started
+    env_file:
+      - config.env
     environment:
       - DB_HOST=dcts-mariadb
       - DB_USER=dcts
@@ -37,9 +45,6 @@ services:
 
   dcts-mariadb:
     image: mariadb:latest
-    depends_on:
-      init:
-        condition: service_completed_successfully
     environment:
       - MARIADB_RANDOM_ROOT_PASSWORD=1
       - MARIADB_DATABASE=dcts
@@ -56,9 +61,6 @@ services:
 
   dcts-redis:
     image: redis:alpine
-    depends_on:
-      init:
-        condition: service_completed_successfully
     volumes:
       - dcts-redis-data:/data
     healthcheck:
@@ -67,23 +69,10 @@ services:
       timeout: 3s
       retries: 10
 
-  dcts-livekit:
-    image: livekit/livekit-server:latest 
-    depends_on:
-      init:
-        condition: service_completed_successfully
-    command: --config "${LIVEKIT_YAML_PATH}"
-    volumes:
-      - ./livekit.yaml:/etc/livekit.yaml
-    ports:
-      - 7881:7881
-      - 7882:7882/udp
-      - 3478:3478/udp
-      - 5349:5349/tcp
-    restart: unless-stopped
-
   caddy:
     image: caddy:2
+    env_file:
+      - config.env
     restart: unless-stopped
     ports:
       - 80:80

@@ -1032,7 +1032,7 @@ export async function startServer() {
     });
 }
 
-const fileContents = fs.readFileSync(process.env.LIVEKIT_YAML_PATH, 'utf8');
+const fileContents = fs.readFileSync(process.env.LIVEKIT_YAML_PATH || "./livekit.yaml", 'utf8');
 const data = yaml.load(fileContents);
 
 const firstEntry = Object.entries(data.keys || {})[0];

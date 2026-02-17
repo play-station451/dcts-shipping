@@ -26,12 +26,11 @@ export async function setCache(identifier, type, data) {
 
     await db.queryDatabase(
         `
-        INSERT INTO cache (identifier, type, data, created)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO cache (identifier, type, data)
+        VALUES (?, ?, ?)
         ON DUPLICATE KEY UPDATE
-            data = VALUES(data),
-            created = VALUES(created)
+            data = VALUES(data)
         `,
-        [identifier, type, data, Date.now()]
+        [identifier, type, data]
     );
 }

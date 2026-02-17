@@ -33,6 +33,7 @@
     "fs-extra": "^11.3.3",
     "get-folder-size": "^2.0.1",
     "htmlparser2": "^10.1.0",
+    "js-yaml": "^4.1.1",
     "jsonwebtoken": "^9.0.3",
     "livekit-server-sdk": "^2.15.0",
     "multer": "^2.0.2",

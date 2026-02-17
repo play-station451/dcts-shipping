@@ -17,3 +17,5 @@ privatekey.json
 
 .idea
 .package-lock.json
+dcts/
+Private_Certs/

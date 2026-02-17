@@ -877,12 +877,11 @@ async function waitForTable(table, interval = 1000) {
             [table]
         );
 
-        if (result.length) {
-            console.log(`${table} exists`);
+        if (result?.length) {
             return;
         }
 
-        console.log(`${table} does not exist yet, retrying...`);
+        Logger.info(`${table} does not exist yet, retrying...`);
         await new Promise(resolve => setTimeout(resolve, interval));
     }
 }
@@ -1006,20 +1005,16 @@ export async function startServer() {
     });
 }
 
-const path = process.env.LIVEKIT_YAML_PATH || "./livekit.yaml";
+const livekitPath = process.env.LIVEKIT_YAML_PATH || "./livekit.yaml";
 
-if (!fs.existsSync(path)) {
-    throw new Error(`LiveKit config file not found at: ${path}`);
+if (!fs.existsSync(livekitPath)) {
+    throw new Error(`LiveKit config file not found at: ${livekitPath}`);
     process.exit(0);
 }
 
-const fileContents = fs.readFileSync(path, "utf8");
-
+const fileContents = fs.readFileSync(livekitPath, "utf8");
 const data = yaml.load(fileContents);
-
 const firstEntry = Object.entries(data.keys || {})[0];
-
-
 
 const API_KEY = firstEntry?.[0] || serverconfig.serverinfo.livekit.key;
 const API_SECRET = firstEntry?.[1] || serverconfig.serverinfo.livekit.secret;

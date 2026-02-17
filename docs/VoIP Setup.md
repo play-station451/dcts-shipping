@@ -28,6 +28,7 @@ Its recommended to create two subdomains for the VoIP system to make things easi
 ## LiveKit Reverse Proxy Setup
 
 ```nginx
+# nginx
 location / {
 	proxy_pass http://127.0.0.1:7880/;
 	proxy_http_version 1.1;

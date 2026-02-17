@@ -12,6 +12,7 @@
 /discover/config.json
 /cache
 /backups
+/public/img/default_emojis/
 privatekey.json
 
 .idea

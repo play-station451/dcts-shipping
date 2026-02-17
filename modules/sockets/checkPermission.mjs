@@ -273,8 +273,13 @@ let permList = {
         type: "checkbox",
         category: ["serverRoles"],
         description: "Allows resolving members. Used internally"
+    },
+    "manageShop": {
+        name: "Manage Shop",
+        type: "checkbox",
+        category: ["serverRoles"],
+        description: "Allows managing the entire shop"
     }
-
 }
 
 export default (io) => (socket) => {

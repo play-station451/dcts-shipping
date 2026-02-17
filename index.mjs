@@ -388,7 +388,7 @@ const processPlugins = async () => {
 // SQL Database Structure needed
 // it will create everything if missing (except database)
 // +1 convenience
-const xxxx = [
+const tables = [
     {
         name: "messages",
         columns: [
@@ -920,12 +920,16 @@ async function waitForTable(table, interval = 1000) {
     Logger.success("Connection established!");
     Logger.space();
 
-    // backup members from config file
-    await checkMemberMigration();
-
+    for (const table of tables) {
+        await db.checkAndCreateTable(table);
+    }
+    
     for (const t of criticalTables) {
         await waitForTable(t);
     }
+
+    // backup members from config file
+    await checkMemberMigration();
 
     await checkMigrations();
     await loadMembersFromDB();

@@ -1,7 +1,18 @@
 services:
+  init:
+    image: alpine:latest
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    environment:
+      - LIVEKIT_URL=lk.wunadacat.com
+    command: sh -c "./startup-files/initialize.sh"
+
   dcts-app:
     image: ghcr.io/hackthedev/dcts-shipping:beta
     depends_on:
+      init:
+        condition: service_completed_successfully
       dcts-mariadb:
         condition: service_healthy
       dcts-redis:
@@ -13,8 +24,6 @@ services:
       - DB_USER=dcts
       - DB_PASS=dcts
       - DB_NAME=dcts
-      - LIVEKIT_URL=livekit.example.com #change this
-      - LIVEKIT_YAML_PATH=/etc/livekit.yaml
       - DEBUG=false # optional
     restart: unless-stopped
     volumes:
@@ -28,6 +37,9 @@ services:
 
   dcts-mariadb:
     image: mariadb:latest
+    depends_on:
+      init:
+        condition: service_completed_successfully
     environment:
       - MARIADB_RANDOM_ROOT_PASSWORD=1
       - MARIADB_DATABASE=dcts
@@ -44,6 +56,9 @@ services:
 
   dcts-redis:
     image: redis:alpine
+    depends_on:
+      init:
+        condition: service_completed_successfully
     volumes:
       - dcts-redis-data:/data
     healthcheck:
@@ -53,7 +68,11 @@ services:
       retries: 10
 
   dcts-livekit:
-    build: ./livekit
+    image: livekit/livekit-server:latest 
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command: --config "${LIVEKIT_YAML_PATH}"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml
     ports:

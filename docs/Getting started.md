@@ -10,15 +10,15 @@ This document explains how to get started with the chat application and explain 
 
 ## Requirements & Recommendations
 
-The software was designed to be setup and run as simple as possible. Using the *`config.json`* file you can manage additional settings that are not present in the web client. For example you could configurate a SQL server compatible with MySQL/MariaDB to improve overall functionality **and unlock all the features**.
+The software was designed to be setup and run as simple as possible. Using the *`config.json`* file you can manage additional settings that are not present in the web client. For example you could configurate a SQL server compatible with MariaDB to improve overall functionality **and unlock all the features**.
 
-| Feature                         | Description                                                  |
-| ------------------------------- | ------------------------------------------------------------ |
-| NodeJS / Bun                    | Required v16.16.0 and above [^testedNodeVersions]            |
-| MySQL/MariaDB-compatible Server | ***Required***. Use MySQL/MariaDB compatible server          |
-| Tenor                           | Deprecated                                                   |
-| SSL / TLS                       | Optional for localhost on same machine, but ***required for public and non-localhost use***! |
-| LiveKit                         | Used for voice chatting and screen sharing                   |
+| Feature      | Description                                                  |
+| ------------ | ------------------------------------------------------------ |
+| NodeJS / Bun | Required v16.16.0 and above [^testedNodeVersions]            |
+| MariaDBr     | ***Required***. **<u>MySQL IS NOT COMPATIBLE</u>**           |
+| Tenor        | Deprecated                                                   |
+| SSL / TLS    | Optional for localhost on same machine, but ***required for public and non-localhost use***! |
+| LiveKit      | Used for voice chatting and screen sharing                   |
 
 ------
 
@@ -75,13 +75,14 @@ Its possible to use more advanced and better starting methods, such as using doc
 
 ------
 
-## Setting up MySQL/MariaDB
+## Setting up MariaDB
 
 > [!TIP]
 >
-> If you dont know how to setup MySQL or MariaDB on linux, you can use [Initra](https://github.com/hackthedev/initra-shipping), an autoinstaller app i've made or check youtube tutorials online and similar sources. On windows you can use [XAMPP](https://www.apachefriends.org/index.html).
+> You can setup MariaDB on linux using `apt install mariadb-server mariadb-client -y`.
+> For windows and testing only you can use XAMPP
 
-A MySQL / MariaDB compatible database connection is **required** for DCTS to work.
+A MariaDB compatible database connection is **required** for DCTS to work.
 
 If you have successfully setup a database server you will need to edit the `sql` section inside the `config.json` file. You **must** set `enabled` to true if thats not the case yet and enter the other information as seen in the example screenshot below. Keep in mind your credentials may be different.
 

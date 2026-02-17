@@ -19,3 +19,5 @@ privatekey.json
 .package-lock.json
 dcts/
 Private_Certs/
+
+config.env

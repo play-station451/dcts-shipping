@@ -16,5 +16,3 @@ turn:
   tls_port: 5349
   udp_port: 3478
   external_tls: true
-keys:
-  APIdWERL2AzMUft: tIqtl1HT4A8iCxseNX17VfBvsOn9kH4fWDiAgaCPr9mB

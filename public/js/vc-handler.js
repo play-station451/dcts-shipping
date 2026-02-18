@@ -12,12 +12,13 @@ let pipLastStream = null;
 
 let fsMuteCache = new Map();
 
+let _lastCtxOk = null;
+
 async function hookVcAudio(mid, isScreen, audioEl) {
     await voip.ensureAudioCtx().catch(() => {});
     const ctxOk = voip._audioCtx && voip._audioCtx.state === "running";
 
     if (ctxOk) {
-        // we mute this shit because webaudio
         audioEl.muted = true;
         audioEl.volume = 0;
 
@@ -25,10 +26,8 @@ async function hookVcAudio(mid, isScreen, audioEl) {
             console.error("Failed to attach audio to WebAudio:", err);
         });
 
-        // will set webaudio heh
         voip.setVolume(mid, isScreen, voip.getVolume(mid, isScreen));
     } else {
-        // for local we dont
         const isSelf = mid === UserManager.getID();
         audioEl.muted = isDeafened || isSelf;
 
@@ -37,6 +36,20 @@ async function hookVcAudio(mid, isScreen, audioEl) {
     }
 }
 
+async function ensureVcAudioRouting() {
+    await voip.ensureAudioCtx().catch(() => {});
+    const ctxOk = voip._audioCtx && voip._audioCtx.state === "running";
+
+    if (_lastCtxOk === ctxOk) return;
+    _lastCtxOk = ctxOk;
+
+    document.querySelectorAll("audio[id^='audio-global-']").forEach(a => {
+        const mid = a.getAttribute("data-member-id");
+        const isScreen = a.id.includes("-screen");
+        if (!mid) return;
+        hookVcAudio(mid, isScreen, a);
+    });
+}
 
 async function setVcVolume(mid, isScreen, percent) {
     const p = Math.max(0, Math.min(400, Number(percent) || 0));
@@ -48,8 +61,7 @@ async function setVcVolume(mid, isScreen, percent) {
     const el = document.getElementById(audioId);
     if (!el) return;
 
-    await voip.ensureAudioCtx().catch(() => {
-    });
+    await voip.ensureAudioCtx().catch(() => {});
     const ctxOk = voip._audioCtx && voip._audioCtx.state === "running";
 
     if (!ctxOk) {
@@ -57,7 +69,6 @@ async function setVcVolume(mid, isScreen, percent) {
         el.muted = isDeafened || mid === UserManager.getID();
     }
 }
-
 
 function pickLatestActiveScreenshare() {
     let bestId = null;
@@ -83,15 +94,45 @@ function pickLatestActiveScreenshare() {
     }
 }
 
+function cleanupAudioElById(audioId, mid, isScreen) {
+    try {
+        voip.detachAudio(mid, isScreen);
+    } catch (e) {}
+
+    const oldEl = document.getElementById(audioId);
+    if (oldEl) {
+        oldEl.srcObject = null;
+        oldEl.remove();
+    }
+}
+
+async function attachAudioTrack(track, participantId, isScreen) {
+    const audioId = `audio-global-${participantId}${isScreen ? "-screen" : ""}`;
+
+    cleanupAudioElById(audioId, participantId, isScreen);
+
+    const audio = track.attach();
+    audio.id = audioId;
+    audio.autoplay = true;
+    audio.setAttribute("data-member-id", participantId);
+
+    document.body.appendChild(audio);
+
+    await hookVcAudio(participantId, isScreen, audio);
+}
+
 function rebuildVcUiFromTracks() {
     if (!voip?.participants) return;
 
-    // cleanup fucking all existing audio elements and detach internals
-    // before rebuilding to prevent this shitty ass duplicate audio streams
     document.querySelectorAll("audio[id^='audio-global-']").forEach(a => {
         const mid = a.getAttribute("data-member-id");
         const isScreen = a.id.includes("-screen");
-        if (mid) voip.detachAudio(mid, isScreen);
+        if (mid) {
+            try {
+                voip.detachAudio(mid, isScreen);
+            } catch (e) {}
+        }
+        a.srcObject = null;
         a.remove();
     });
 
@@ -105,8 +146,7 @@ function rebuildVcUiFromTracks() {
                 p.videoTrack.attach(video);
                 video.muted = true;
                 video.style.display = "block";
-                video.play().catch(() => {
-                });
+                video.play().catch(() => {});
                 const mst = p.videoTrack.mediaStreamTrack;
                 if (mst) lastUserStream = new MediaStream([mst]);
             }
@@ -119,8 +159,7 @@ function rebuildVcUiFromTracks() {
                 p.screenTrack.attach(video);
                 video.muted = true;
                 video.style.display = "block";
-                video.play().catch(() => {
-                });
+                video.play().catch(() => {});
                 const mst = p.screenTrack.mediaStreamTrack;
                 if (mst) {
                     screenStreams[memberId] = new MediaStream([mst]);
@@ -135,27 +174,14 @@ function rebuildVcUiFromTracks() {
         }
 
         if (p.audioTrack) {
-            const audioId = `audio-global-${memberId}`;
-            const audio = p.audioTrack.attach();
-            audio.id = audioId;
-            audio.autoplay = true;
-            audio.setAttribute("data-member-id", memberId);
-            document.body.appendChild(audio);
-            hookVcAudio(memberId, false, audio);
+            attachAudioTrack(p.audioTrack, memberId, false);
         }
 
         if (p.screenAudioTrack) {
-            const audioId = `audio-global-${memberId}-screen`;
-            const audio = p.screenAudioTrack.attach();
-            audio.id = audioId;
-            audio.autoplay = true;
-            audio.setAttribute("data-member-id", memberId);
-            document.body.appendChild(audio);
-            hookVcAudio(memberId, true, audio);
+            attachAudioTrack(p.screenAudioTrack, memberId, true);
         }
     });
 
-    // rebuild local ss card if sharins
     const myId = UserManager.getID();
     if (voip.isScreensharing && !document.getElementById(`vc-card-${myId}-screen`)) {
         const card = getOrCreateUserCard(myId, true);
@@ -171,16 +197,17 @@ function rebuildVcUiFromTracks() {
 document.addEventListener("DOMContentLoaded", async event => {
     initGlobalPip();
     setInterval(checkPipVisibility, 500);
+    setInterval(ensureVcAudioRouting, 500);
 
-    socket.on('connect', () => {
-        document.querySelectorAll('#channellist li[data-channel-id]').forEach(li => {
+    socket.on("connect", () => {
+        document.querySelectorAll("#channellist li[data-channel-id]").forEach(li => {
             syncVcChannelMembers(li.dataset.channelId);
         });
     });
 
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            document.querySelectorAll('#channellist li[data-channel-id]').forEach(li => {
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            document.querySelectorAll("#channellist li[data-channel-id]").forEach(li => {
                 syncVcChannelMembers(li.dataset.channelId);
             });
         }
@@ -190,7 +217,7 @@ document.addEventListener("DOMContentLoaded", async event => {
         if (username === UserManager.getID()) {
             setProfileQaIndicatorStatusText({
                 text: `Talking in`,
-                channel: document.querySelector('#channelname')?.innerText,
+                channel: document.querySelector("#channelname")?.innerText,
                 color: "#23a55a"
             });
 
@@ -208,10 +235,13 @@ document.addEventListener("DOMContentLoaded", async event => {
 
     voip.onLeave = (participantId) => {
         document.querySelectorAll(`[data-member-id="${participantId}"]`).forEach(e => e.remove());
-        document.querySelectorAll(`audio[id^="audio-global-${participantId}"]`).forEach(a => a.remove());
+        document.querySelectorAll(`audio[id^="audio-global-${participantId}"]`).forEach(a => {
+            a.srcObject = null;
+            a.remove();
+        });
 
-        voip.detachAudio(participantId, false);
-        voip.detachAudio(participantId, true);
+        try { voip.detachAudio(participantId, false); } catch (e) {}
+        try { voip.detachAudio(participantId, true); } catch (e) {}
 
         delete screenStartTs[participantId];
         delete screenStreams[participantId];
@@ -222,31 +252,11 @@ document.addEventListener("DOMContentLoaded", async event => {
         emitVcMemberLeft(participantId);
     };
 
-
     voip.onTrackSubscribed = (track, participantId, isScreen) => {
         getOrCreateUserCard(participantId, isScreen === true);
 
         if (track.kind === "audio") {
-            const audioId = `audio-global-${participantId}${isScreen ? '-screen' : ''}`;
-
-            // clean shit up first
-            voip.detachAudio(participantId, isScreen === true);
-            const oldEl = document.getElementById(audioId);
-            if (oldEl) {
-                oldEl.srcObject = null;
-                oldEl.remove();
-            }
-
-            const audio = track.attach();
-            audio.id = audioId;
-
-            // mute this shit to avoid dups
-            audio.muted = true;
-            audio.autoplay = true;
-            audio.setAttribute("data-member-id", participantId);
-            document.body.appendChild(audio);
-
-            hookVcAudio(participantId, isScreen === true, audio);
+            attachAudioTrack(track, participantId, isScreen === true);
             return;
         }
 
@@ -258,8 +268,7 @@ document.addEventListener("DOMContentLoaded", async event => {
             track.attach(video);
             video.muted = true;
             video.style.display = "block";
-            video.play().catch(() => {
-            });
+            video.play().catch(() => {});
 
             const mst = track.mediaStreamTrack;
             if (mst) {
@@ -281,10 +290,6 @@ document.addEventListener("DOMContentLoaded", async event => {
         }
     };
 
-
-    // track timestamp for ALL users including local
-    // without screenStartTs isnt set for local user
-    // rebuildVcUiFromTracks cant restore the screen card after channel switch L
     voip.onScreenshareBegin = (participantId) => {
         screenStartTs[participantId] = Date.now();
     };
@@ -296,9 +301,12 @@ document.addEventListener("DOMContentLoaded", async event => {
 
         document
             .querySelectorAll(`audio[id^="audio-global-${participantId}-screen"]`)
-            .forEach(a => a.remove());
+            .forEach(a => {
+                a.srcObject = null;
+                a.remove();
+            });
 
-        voip.detachAudio(participantId, true);
+        try { voip.detachAudio(participantId, true); } catch (e) {}
         voip._volumes.delete(`${participantId}:screen`);
 
         delete screenStartTs[participantId];
@@ -311,12 +319,11 @@ document.addEventListener("DOMContentLoaded", async event => {
         checkPipVisibility();
     };
 
-
     voip.onSpeaking = (participantId) => {
         highlightUser(participantId);
     };
 
-    socket.on('vcMemberJoined', async function (response) {
+    socket.on("vcMemberJoined", async function (response) {
         let mid = response?.memberId;
         let cid = response?.channelId;
         if (!mid || !cid) return;
@@ -328,7 +335,7 @@ document.addEventListener("DOMContentLoaded", async event => {
         }
     });
 
-    socket.on('vcMemberLeft', async function (response) {
+    socket.on("vcMemberLeft", async function (response) {
         let mid = response?.memberId;
         let cid = response?.channelId;
 
@@ -336,16 +343,18 @@ document.addEventListener("DOMContentLoaded", async event => {
 
         if (mid) {
             document.querySelectorAll(`.vc-card[data-member-id="${mid}"]`).forEach(e => e.remove());
-            document.querySelectorAll(`audio[id^="audio-global-${mid}"]`).forEach(e => e.remove());
+            document.querySelectorAll(`audio[id^="audio-global-${mid}"]`).forEach(e => {
+                e.srcObject = null;
+                e.remove();
+            });
 
-            voip.detachAudio(mid, false);
-            voip.detachAudio(mid, true);
+            try { voip.detachAudio(mid, false); } catch (e) {}
+            try { voip.detachAudio(mid, true); } catch (e) {}
 
             checkPipVisibility();
         }
     });
 });
-
 
 function getOrCreateUserCard(memberId, isScreen = false) {
     let grid = document.getElementById("vc-grid");
@@ -397,7 +406,6 @@ function getOrCreateUserCard(memberId, isScreen = false) {
       </div>
     `;
 
-
     grid.insertAdjacentHTML("beforeend", html);
     card = document.getElementById(cardId);
 
@@ -414,7 +422,6 @@ function getOrCreateUserCard(memberId, isScreen = false) {
 
     return card;
 }
-
 
 async function setupVC(roomId) {
     if (!roomId) return;
@@ -473,7 +480,7 @@ async function setupVC(roomId) {
 
         setProfileQaIndicatorStatusText({
             text: `Talking in`,
-            channel: document.querySelector('#channelname')?.innerText || "Voice",
+            channel: document.querySelector("#channelname")?.innerText || "Voice",
             color: "#23a55a"
         });
 
@@ -485,7 +492,6 @@ async function setupVC(roomId) {
         if (w) w.style.opacity = "1";
     }, 50);
 }
-
 
 function updateUiButtons() {
     const isMuted = voip && typeof voip.isMuted === "function" ? voip.isMuted() : false;
@@ -578,8 +584,7 @@ function togglePip(show) {
     v.muted = true;
     v.playsInline = true;
     pipContent.appendChild(v);
-    v.play().catch(() => {
-    });
+    v.play().catch(() => {});
 
     updateUiButtons();
 }
@@ -646,7 +651,6 @@ function makePipDraggable() {
             el.style.bottom = "auto";
         };
 
-
         const onUp = () => {
             document.body.style.userSelect = "";
             el.style.height = "";
@@ -658,7 +662,6 @@ function makePipDraggable() {
         document.addEventListener("mouseup", onUp);
     };
 }
-
 
 async function toggleMic() {
     if (isDeafened) return;
@@ -694,7 +697,6 @@ async function toggleDeafen() {
     updateUiButtons();
 }
 
-
 function leaveVC() {
     const cid = connectedVcChannel || UserManager.getChannel();
     const myId = UserManager.getID();
@@ -712,10 +714,13 @@ function leaveVC() {
     document.getElementById("channelname-icons").innerHTML = "";
     let pip = document.getElementById("vc-pip-overlay");
     if (pip) pip.style.display = "none";
-    document.querySelectorAll("audio[id^='audio-global-']").forEach(el => el.remove());
+    document.querySelectorAll("audio[id^='audio-global-']").forEach(el => {
+        el.srcObject = null;
+        el.remove();
+    });
 
-    voip.detachAudio(myId, false);
-    voip.detachAudio(myId, true);
+    try { voip.detachAudio(myId, false); } catch (e) {}
+    try { voip.detachAudio(myId, true); } catch (e) {}
 
     screenStartTs = {};
     screenStreams = {};
@@ -724,7 +729,6 @@ function leaveVC() {
     lastScreenStream = null;
     lastUserStream = null;
 }
-
 
 async function toggleScreenshare() {
     if (voip.isScreensharing) {
@@ -839,7 +843,7 @@ function toggleFullscreenMute(btn) {
 
 async function getVCMembers(channelId) {
     return new Promise((resolve) => {
-        socket.emit('getVcChannelMembers', {
+        socket.emit("getVcChannelMembers", {
             id: UserManager.getID(),
             token: UserManager.getToken(),
             channelId
@@ -884,7 +888,7 @@ async function addVcMemberToChannel(cid, mid) {
 
         if (m.icon === "null") m.icon = null;
         check.element.insertAdjacentHTML("beforeend",
-            `<li class="participant" data-member-id="${m.id}"><img class="avatar" src="${m.icon || '/img/default_pfp.png'}">${m.name}</li>`
+            `<li class="participant" data-member-id="${m.id}"><img class="avatar" src="${m.icon || "/img/default_pfp.png"}">${m.name}</li>`
         );
         check.element.style.display = "flex";
     }
@@ -918,7 +922,7 @@ async function syncVcChannelMembers(channelId) {
 
         if (m.icon === "null") m.icon = null;
         check.element.insertAdjacentHTML("beforeend",
-            `<li class="participant" data-member-id="${m.id}"><img class="avatar" src="${m.icon || '/img/default_pfp.png'}">${m.name}</li>`
+            `<li class="participant" data-member-id="${m.id}"><img class="avatar" src="${m.icon || "/img/default_pfp.png"}">${m.name}</li>`
         );
     }
 

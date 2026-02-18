@@ -77,10 +77,10 @@ class VoIP {
 
         let tracks = await this.room.localParticipant.createScreenTracks({
             audio: includeAudio ? {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false,
-                voiceIsolation: false
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                voiceIsolation: true
             } : false,
             video: {
                 resolution: this.streamSettings.resolution,
@@ -149,11 +149,11 @@ class VoIP {
                 audioPreset: LivekitClient.AudioPresets.musicHighQuality
             },
             audioCaptureDefaults: {
-                echoCancellation: false,
-                noiseSuppression: false,
+                echoCancellation: true,
+                noiseSuppression: true,
                 autoGainControl: false,
                 sampleRate: 48000,
-                voiceIsolation: false,
+                voiceIsolation: true,
             }
         });
 

@@ -7,8 +7,7 @@ if(!fs.existsSync(versionPath)) {
     Logger.error("Version path not found!!")
     process.exit(1);
 }
-export let versionCode = fs.readFileSync(versionPath);
-
+export let versionCode = fs.readFileSync(versionPath).toString();
 
 import express from "express";
 

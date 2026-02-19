@@ -1,15 +1,229 @@
-document.addEventListener("DOMContentLoaded", async event => {
-    voip.onJoin = (username) => {
-        console.log(`${username} joined`);
+let connectedVcChannel = 0;
+let isInVc = false;
+let isDeafened = false;
+let lastScreenStream = null;
+let lastUserStream = null;
 
-        setTimeout(() => {
-            if(username === UserManager.getID()){
-                setProfileQaIndicatorStatusText({
-                    text: `You're talking in`,
-                    channel: document.querySelector('#channelname').innerText
-                })
+let lastScreenOwner = null;
+let lastScreenCreatedAt = 0;
+let screenStartTs = {};
+let screenStreams = {};
+let pipLastStream = null;
+
+let fsMuteCache = new Map();
+
+let _lastCtxOk = null;
+
+async function hookVcAudio(mid, isScreen, audioEl) {
+    await voip.ensureAudioCtx().catch(() => {});
+    const ctxOk = voip._audioCtx && voip._audioCtx.state === "running";
+
+    if (ctxOk) {
+        audioEl.muted = true;
+        audioEl.volume = 0;
+
+        await voip.attachAudioEl(mid, isScreen, audioEl).catch(err => {
+            console.error("Failed to attach audio to WebAudio:", err);
+        });
+
+        voip.setVolume(mid, isScreen, voip.getVolume(mid, isScreen));
+    } else {
+        const isSelf = mid === UserManager.getID();
+        audioEl.muted = isDeafened || isSelf;
+
+        const p = voip.getVolume(mid, isScreen);
+        audioEl.volume = Math.max(0, Math.min(1, (Number(p) || 100) / 100));
+    }
+}
+
+async function ensureVcAudioRouting() {
+    await voip.ensureAudioCtx().catch(() => {});
+    const ctxOk = voip._audioCtx && voip._audioCtx.state === "running";
+
+    if (_lastCtxOk === ctxOk) return;
+    _lastCtxOk = ctxOk;
+
+    document.querySelectorAll("audio[id^='audio-global-']").forEach(a => {
+        const mid = a.getAttribute("data-member-id");
+        const isScreen = a.id.includes("-screen");
+        if (!mid) return;
+        hookVcAudio(mid, isScreen, a);
+    });
+}
+
+async function setVcVolume(mid, isScreen, percent) {
+    const p = Math.max(0, Math.min(400, Number(percent) || 0));
+    voip.setVolume(mid, isScreen, p);
+
+    if (isScreen) return;
+
+    const audioId = `audio-global-${mid}`;
+    const el = document.getElementById(audioId);
+    if (!el) return;
+
+    await voip.ensureAudioCtx().catch(() => {});
+    const ctxOk = voip._audioCtx && voip._audioCtx.state === "running";
+
+    if (!ctxOk) {
+        el.volume = Math.max(0, Math.min(1, p / 100));
+        el.muted = isDeafened || mid === UserManager.getID();
+    }
+}
+
+function pickLatestActiveScreenshare() {
+    let bestId = null;
+    let bestTs = 0;
+
+    for (const [mid, ts] of Object.entries(screenStartTs)) {
+        if (!ts) continue;
+        if (!screenStreams[mid]) continue;
+        if (ts > bestTs) {
+            bestTs = ts;
+            bestId = mid;
+        }
+    }
+
+    if (bestId) {
+        lastScreenOwner = bestId;
+        lastScreenCreatedAt = bestTs;
+        lastScreenStream = screenStreams[bestId];
+    } else {
+        lastScreenOwner = null;
+        lastScreenCreatedAt = 0;
+        lastScreenStream = null;
+    }
+}
+
+function cleanupAudioElById(audioId, mid, isScreen) {
+    try {
+        voip.detachAudio(mid, isScreen);
+    } catch (e) {}
+
+    const oldEl = document.getElementById(audioId);
+    if (oldEl) {
+        oldEl.srcObject = null;
+        oldEl.remove();
+    }
+}
+
+async function attachAudioTrack(track, participantId, isScreen) {
+    const audioId = `audio-global-${participantId}${isScreen ? "-screen" : ""}`;
+
+    cleanupAudioElById(audioId, participantId, isScreen);
+
+    const audio = track.attach();
+    audio.id = audioId;
+    audio.autoplay = true;
+    audio.setAttribute("data-member-id", participantId);
+
+    document.body.appendChild(audio);
+
+    await hookVcAudio(participantId, isScreen, audio);
+}
+
+function rebuildVcUiFromTracks() {
+    if (!voip?.participants) return;
+
+    document.querySelectorAll("audio[id^='audio-global-']").forEach(a => {
+        const mid = a.getAttribute("data-member-id");
+        const isScreen = a.id.includes("-screen");
+        if (mid) {
+            try {
+                voip.detachAudio(mid, isScreen);
+            } catch (e) {}
+        }
+        a.srcObject = null;
+        a.remove();
+    });
+
+    voip.participants.forEach((p, memberId) => {
+        if (!memberId) return;
+
+        if (p.videoTrack) {
+            const card = getOrCreateUserCard(memberId, false);
+            const video = card?.querySelector("video");
+            if (video) {
+                p.videoTrack.attach(video);
+                video.muted = true;
+                video.style.display = "block";
+                video.play().catch(() => {});
+                const mst = p.videoTrack.mediaStreamTrack;
+                if (mst) lastUserStream = new MediaStream([mst]);
             }
-        }, 1500)
+        }
+
+        if (p.screenTrack) {
+            const card = getOrCreateUserCard(memberId, true);
+            const video = card?.querySelector("video");
+            if (video) {
+                p.screenTrack.attach(video);
+                video.muted = true;
+                video.style.display = "block";
+                video.play().catch(() => {});
+                const mst = p.screenTrack.mediaStreamTrack;
+                if (mst) {
+                    screenStreams[memberId] = new MediaStream([mst]);
+                    const ts = screenStartTs[memberId] || 0;
+                    if (ts >= lastScreenCreatedAt) {
+                        lastScreenCreatedAt = ts || Date.now();
+                        lastScreenOwner = memberId;
+                        lastScreenStream = screenStreams[memberId];
+                    }
+                }
+            }
+        }
+
+        if (p.audioTrack) {
+            attachAudioTrack(p.audioTrack, memberId, false);
+        }
+
+        if (p.screenAudioTrack) {
+            attachAudioTrack(p.screenAudioTrack, memberId, true);
+        }
+    });
+
+    const myId = UserManager.getID();
+    if (voip.isScreensharing && !document.getElementById(`vc-card-${myId}-screen`)) {
+        const card = getOrCreateUserCard(myId, true);
+        const video = card?.querySelector("video");
+        if (video && screenStreams[myId]) {
+            video.srcObject = screenStreams[myId];
+            video.style.display = "block";
+            video.play().catch(() => {});
+        }
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async event => {
+    initGlobalPip();
+    setInterval(checkPipVisibility, 500);
+    setInterval(ensureVcAudioRouting, 500);
+
+    socket.on("connect", () => {
+        document.querySelectorAll("#channellist li[data-channel-id]").forEach(li => {
+            syncVcChannelMembers(li.dataset.channelId);
+        });
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            document.querySelectorAll("#channellist li[data-channel-id]").forEach(li => {
+                syncVcChannelMembers(li.dataset.channelId);
+            });
+        }
+    });
+
+    voip.onJoin = (username) => {
+        if (username === UserManager.getID()) {
+            setProfileQaIndicatorStatusText({
+                text: `Talking in`,
+                channel: document.querySelector("#channelname")?.innerText,
+                color: "#23a55a"
+            });
+
+            isDeafened = false;
+            updateUiButtons();
+        }
 
         socket.emit("notifyVcMemberJoined", {
             id: UserManager.getID(),
@@ -20,431 +234,701 @@ document.addEventListener("DOMContentLoaded", async event => {
     };
 
     voip.onLeave = (participantId) => {
-        console.log(`${participantId} Left the room`);
+        document.querySelectorAll(`[data-member-id="${participantId}"]`).forEach(e => e.remove());
+        document.querySelectorAll(`audio[id^="audio-global-${participantId}"]`).forEach(a => {
+            a.srcObject = null;
+            a.remove();
+        });
 
-        let streamContainer = getStreamContainer();
-        let elements = streamContainer?.parentNode?.querySelectorAll(`[data-member-id="${participantId}"]`)
-        elements?.forEach(element => {
-            element?.remove();
-        })
+        try { voip.detachAudio(participantId, false); } catch (e) {}
+        try { voip.detachAudio(participantId, true); } catch (e) {}
+
+        delete screenStartTs[participantId];
+        delete screenStreams[participantId];
+        if (participantId === lastScreenOwner) {
+            pickLatestActiveScreenshare();
+        }
 
         emitVcMemberLeft(participantId);
     };
 
     voip.onTrackSubscribed = (track, participantId, isScreen) => {
-        let streamsContainer = getStreamContainer();
-        const mediaEl = track.attach();
-        mediaEl.autoplay = true;
-        mediaEl.controls = true;
-        mediaEl.setAttribute("data-member-id", participantId);
+        getOrCreateUserCard(participantId, isScreen === true);
 
-        // some fucking magic that i prob wont remember next day
-        if (isScreen) {
-            let videoEl = mediaEl.querySelector(`video[data-member-id="${participantId}"]`);
-            if (!videoEl) {
-                videoEl = document.createElement("video");
-            }
-            videoEl.srcObject = new MediaStream([track.mediaStreamTrack]);
-            videoEl.autoplay = true;
-            videoEl.controls = true;
-            videoEl.setAttribute("data-member-id", participantId);
-
-            streamsContainer.appendChild(mediaEl);
-            addVcMember(participantId)
+        if (track.kind === "audio") {
+            attachAudioTrack(track, participantId, isScreen === true);
             return;
         }
 
-        streamsContainer.appendChild(mediaEl);
-        addVcMember(participantId)
+        if (track.kind === "video") {
+            const card = getOrCreateUserCard(participantId, isScreen === true);
+            const video = card?.querySelector("video");
+            if (!video) return;
+
+            track.attach(video);
+            video.muted = true;
+            video.style.display = "block";
+            video.play().catch(() => {});
+
+            const mst = track.mediaStreamTrack;
+            if (mst) {
+                const s = new MediaStream([mst]);
+
+                if (isScreen) {
+                    screenStreams[participantId] = s;
+
+                    const ts = screenStartTs[participantId] || Date.now();
+                    if (ts >= lastScreenCreatedAt) {
+                        lastScreenCreatedAt = ts;
+                        lastScreenOwner = participantId;
+                        lastScreenStream = s;
+                    }
+                } else {
+                    lastUserStream = s;
+                }
+            }
+        }
     };
 
-    voip.onScreenshareBegin = (participantId, track) => {
-        console.log(`${participantId} started a screenshare`)
+    voip.onScreenshareBegin = (participantId) => {
+        screenStartTs[participantId] = Date.now();
+    };
 
-        // super fucking magic line
-        if (participantId === UserManager.getID()) return;
+    voip.onScreenshareEnd = (participantId) => {
+        document
+            .querySelectorAll(`.vc-card[data-member-id="${participantId}"][data-type="screen"]`)
+            .forEach(e => e.remove());
 
-        let container = document.querySelector(".vc-row.screenshares")
+        document
+            .querySelectorAll(`audio[id^="audio-global-${participantId}-screen"]`)
+            .forEach(a => {
+                a.srcObject = null;
+                a.remove();
+            });
 
-        // handle display logic for screensharing etc... at this point
-        // im super confused and also know whats happening.
-        // in other words: im freestyling like crazy but it works.
-        let videoEl = container.querySelector(`video[data-member-id="${participantId}"]`);
-        if (!videoEl) {
-            console.warn("Video element not found!!!!!")
-            return;
-        }
-        videoEl.autoplay = true;
-        videoEl.controls = true;
+        try { voip.detachAudio(participantId, true); } catch (e) {}
+        voip._volumes.delete(`${participantId}:screen`);
 
-        // add track
-        videoEl.srcObject = new MediaStream([track.mediaStreamTrack]);
+        delete screenStartTs[participantId];
+        delete screenStreams[participantId];
 
-
-        // handle screenshare audio now too
-        if (track.audioTrack) {
-            let audioEl = container.querySelector(`audio[data-member-id="${participantId}"]`);
-            if (!audioEl) {
-                console.warn("Audio element not found!!!")
-                return;
-            }
-
-            audioEl.srcObject = new MediaStream([track.audioTrack.mediaStreamTrack]);
-            audioEl.autoplay = true;
-
-            videoEl.onpause = () => {
-                audioEl.pause();
-                audioEl.volume = 0;
-                videoEl.muted = true;
-            }
-
-            videoEl.onplay = () => {
-                audioEl.play();
-                audioEl.volume = 1;
-                videoEl.muted = false;
-            }
+        if (participantId === lastScreenOwner) {
+            pickLatestActiveScreenshare();
         }
 
-        videoEl.muted = false;
-        videoEl.play();
+        checkPipVisibility();
     };
 
     voip.onSpeaking = (participantId) => {
-        console.log("highlighting", participantId)
         highlightUser(participantId);
     };
 
+    socket.on("vcMemberJoined", async function (response) {
+        let mid = response?.memberId;
+        let cid = response?.channelId;
+        if (!mid || !cid) return;
 
-    voip.onScreenshareEnd = (participantId) => {
-        console.log(`${participantId} stopped a screenshare`)
-        let streamsContainer = getStreamContainer();
-        console.log("Screenshare ended:", participantId);
-        const container = streamsContainer.querySelector(`video[data-member-id="${participantId}"]`);
-        container?.remove();
-    };
+        addVcMemberToChannel(cid, mid);
 
-    socket.on('vcMemberJoined', async function (response) {
-        let intMemberId = Number(response?.memberId);
-        let intChannelId = Number(response?.channelId);
-        addVcMemberToChannel(intChannelId, intMemberId)
+        if (isInVc && String(connectedVcChannel) === String(cid)) {
+            getOrCreateUserCard(mid, false);
+        }
     });
 
-    socket.on('vcMemberLeft', async function (response) {
-        let intMemberId = Number(response?.memberId);
-        let intChannelId = Number(response?.channelId);
+    socket.on("vcMemberLeft", async function (response) {
+        let mid = response?.memberId;
+        let cid = response?.channelId;
 
-        console.log(intChannelId)
-        console.log(intMemberId)
-        removeVcMemberFromChannel(intChannelId, intMemberId)
+        removeVcMemberFromChannel(cid, mid);
+
+        if (mid) {
+            document.querySelectorAll(`.vc-card[data-member-id="${mid}"]`).forEach(e => e.remove());
+            document.querySelectorAll(`audio[id^="audio-global-${mid}"]`).forEach(e => {
+                e.srcObject = null;
+                e.remove();
+            });
+
+            try { voip.detachAudio(mid, false); } catch (e) {}
+            try { voip.detachAudio(mid, true); } catch (e) {}
+
+            checkPipVisibility();
+        }
     });
 });
 
-let talking = new Map();
-function highlightUser(participantId) {
-    let userElements = document.querySelectorAll(`.vc-container .participant[data-member-id="${participantId}"] img`);
-    userElements = [document.querySelector(`.participant[data-member-id="${participantId}"] img.avatar`), document.querySelector("#profile-qa-img"), ...userElements];
+function getOrCreateUserCard(memberId, isScreen = false) {
+    let grid = document.getElementById("vc-grid");
+    if (!grid) return null;
 
-    let borderCode = "2px solid red";
+    let type = isScreen ? "screen" : "user";
+    let cardId = `vc-card-${memberId}-${type}`;
+    let card = document.getElementById(cardId);
+    if (card) return card;
 
-    userElements.forEach((element) => {
-        if (!element) return;
-        let key = participantId + "_" + element.getAttribute("data-member-id")
-        console.log(element)
+    const vol = voip?.getVolume ? voip.getVolume(memberId, isScreen) : 100;
 
-        console.log(key)
-        if (talking.has(key)) {
-            clearTimeout(talking.get(key));
-            talking.delete(key);
+    let html = `
+      <div class="vc-card ${isScreen ? "screen-only" : ""}"
+           id="${cardId}"
+           data-member-id="${memberId}"
+           data-type="${type}"
+           onclick="openFullscreen('${memberId}', ${isScreen})">
+    
+        ${isScreen ? "" : `
+          <div class="avatar-container">
+            <img class="vc-avatar" src="/img/default_pfp.png" data-member-id="${memberId}">
+          </div>
+        `}
+    
+        <video autoplay playsinline muted style="display:none;"></video>
+    
+        <div class="vc-volwrap"
+             onmousedown="event.stopPropagation()"
+             onclick="event.stopPropagation()">
+          <input class="vc-vol" type="range" min="0" max="400" value="${vol}"
+            oninput="
+              setVcVolume('${memberId}', ${isScreen}, this.value);
+              this.nextElementSibling.innerText = this.value + '%';
+            ">
+          <div class="vc-volpct">${vol}%</div>
+        </div>
+    
+           ${isScreen ? `
+              <div class="username" data-member-id="${memberId}">
+                <span class="uname">User ${memberId}</span>
+                <span class="vc-badge">&bullet; Screen</span>
+              </div>
+        ` : `
+              <div class="username" data-member-id="${memberId}">
+                <span class="uname">User ${memberId}</span>
+              </div>
+        `}
+      </div>
+    `;
+
+    grid.insertAdjacentHTML("beforeend", html);
+    card = document.getElementById(cardId);
+
+    ChatManager.resolveMember(memberId).then(member => {
+        if (!card || !document.body.contains(card)) return;
+        if (member) {
+            if (member.icon === "null") member.icon = null;
+            const avatar = card.querySelector(".vc-avatar");
+            const uname = card.querySelector(".username .uname");
+            if (avatar) avatar.src = member.icon || "/img/default_pfp.png";
+            if (uname) uname.innerText = member.name;
         }
-
-        element.style.border = borderCode;
-        let timeout = setTimeout(() => {
-            element.style.border = "2px solid transparent";
-            talking.delete(key);
-        }, 1000);
-
-        talking.set(key, timeout);
     });
-}
 
-
-function getStreamContainer() {
-    return document.querySelector(".vc-row.screenshares")
-}
-
-async function addVcMember(memberId) {
-    let contentContainer = document.getElementById("content");
-
-    let member = await ChatManager.resolveMember(memberId);
-    if (!member) {
-        console.error("Couldnt resovle member in vc handler");
-        return;
-    }
-
-    let memberElement = contentContainer.querySelector(`.participants .participant[data-member-id="${memberId}"]`);
-    if (!memberElement) {
-        let memberContainer = contentContainer.querySelector(`.participants`);
-        if (memberContainer) {
-            memberContainer.insertAdjacentHTML("beforeend", `
-            <div class="participant" data-member-id="${memberId}">
-                    <img data-member-id="${memberId}" src="${member.icon ? member.icon : "/img/default_icon.png"}" />
-                    <p data-member-id="${memberId}">${member.name}</p>
-                </div>
-            `);
-        }
-    }
-}
-
-function emitVcMemberLeft(memberId, channelId = null) {
-    socket.emit("notifyVcMemberLeft", {
-        id: UserManager.getID(),
-        token: UserManager.getToken(),
-        channelId: channelId ? channelId : UserManager.getChannel(),
-        memberId
-    });
-}
-
-function checkVcMemberChannel(intChannelId, intMemberId) {
-    intChannelId = Number(intChannelId);
-    intMemberId = String(intMemberId);
-
-    if(isNaN(intMemberId) || !intMemberId){
-        console.warn("Invalid member id or channel id when showing member in channel");
-        return { status: false };
-    }
-
-    let participantsContainer = document.querySelector(`#channellist li[data-channel-id="${intChannelId}"] .participants`);
-    if(!participantsContainer){
-        console.warn("Couldnt add or remove member to vc participants list as the container wasnt found: ", intChannelId);
-        return { status: false };
-    }
-
-    return {
-        element: participantsContainer,
-        status: true
-    }
-}
-
-let connectedVcChannel = 0;
-let isInVc = false;
-function leaveVC(){
-    voip.leaveRoom()
-    emitVcMemberLeft(UserManager.getID(), connectedVcChannel);
-    isInVc = false;
-    toggleProfileQaIndicator(false);
-    highlightUser(UserManager.getID());
-}
-
-async function removeVcMemberFromChannel(intChannelId, intMemberId){
-    let checkResult = checkVcMemberChannel(intChannelId, intMemberId);
-    if(checkResult.status === false){
-        return;
-    }
-
-    if(checkResult.element){
-        let oMember = await ChatManager.resolveMember(intMemberId);
-        if(!oMember){
-            console.warn("Coudlnt resolve member for vc participants list");
-            return
-        }
-
-        // only list the member if he isnt listed already
-        let memberIsListed = checkResult.element.querySelectorAll(`li[data-member-id='${oMember.id}']`).length > 0;
-        if(memberIsListed){
-            checkResult.element.querySelector(`li[data-member-id='${oMember.id}']`).remove();
-        }
-
-        if(checkResult.element.querySelectorAll("li").length === 0){
-            checkResult.element.style.display = "none";
-        }
-    }
-}
-
-
-async function addVcMemberToChannel(intChannelId, intMemberId){
-    let checkResult = checkVcMemberChannel(intChannelId, intMemberId);
-    if(checkResult.status === false){
-        return;
-    }
-
-    if( checkResult.element){
-        let oMember = await ChatManager.resolveMember(intMemberId);
-        if(!oMember){
-            console.warn("Coudlnt resolve member for vc participants list");
-            return
-        }
-
-        // only list the member if he isnt listed already
-        let memberIsListed =  checkResult.element.querySelectorAll(`li[data-member-id='${oMember.id}']`).length > 0;
-        if(!memberIsListed){
-            checkResult.element.insertAdjacentHTML("beforeend",
-                `<li class="participant" data-member-id="${oMember.id}"><img class="avatar" data-member-id="${oMember.id}" src="${oMember.icon.trim() ? oMember.icon : "/img/default_icon.png"}">${truncateText(oMember.name, 25)}</li>`
-            );
-        }
-
-        if( checkResult.element.querySelectorAll("li").length > 0){
-            checkResult.element.style.display = "flex";
-        }
-    }
-}
-
-function toggleMic(){
-    const channelIconMic = document.querySelector("#channelname-icons .muteMic.icon");
-    voip.toggleMic();
-    if(voip.isMuted()){
-        channelIconMic.classList.add("muted");
-    }
-    else{
-        channelIconMic.classList.remove("muted");
-    }
-}
-
-function toggleScreenshare(){
-    try{
-        if(voip.isScreensharing){
-            voip.stopScreenshare();
-        }
-        else{
-            customPrompts.showPrompt(
-                "Stream Settings",
-                `
-                    <div style="margin: 20px 0;">
-                        <div class="prompt-form-group">
-                            <label class="prompt-label" for="resolutionSelect">Resolution</label>
-                            <select id="resolutionSelect" class="prompt-select">
-                                <option value="1280x720">1280x720 (HD)</option>
-                                <option value="1920x1080" selected>1920x1080 (Full HD)</option>
-                                <option value="2560x1440">2560x1440 (QHD)</option>
-                                <option value="3840x2160">3840x2160 (4K)</option>
-                            </select>
-                        </div>
-            
-                        <div class="prompt-form-group">
-                            <label class="prompt-label" for="bitrateSelect">Bitrate (Mbit/s)</label>
-                            <select id="bitrateSelect" class="prompt-select">
-                                <option value="0.8">0.8 Mbit</option>
-                                <option value="1.5" selected>1.5 Mbit</option>
-                                <option value="3">3 Mbit</option>
-                                <option value="5">5 Mbit</option>
-                                <option value="8">8 Mbit</option>
-                                <option value="12">12 Mbit</option>
-                            </select>
-                        </div>
-            
-                        <div class="prompt-form-group">
-                            <label class="prompt-label" for="fpsSelect">FPS</label>
-                            <select class="prompt-select" id="fpsSelect">
-                                <option value="30">30 FPS</option>
-                                <option value="60" selected>60 FPS</option>
-                                <option value="90">90 FPS</option>
-                                <option value="12">120 FPS</option>
-                            </select>
-                        </div>
-                    </div>
-            
-                    <li class="prompt-note">Select your desired streaming quality.</li>
-                `,
-                async () => {
-                    const resolution = document.getElementById("resolutionSelect").value;
-                    const bitrateMbit = parseFloat(document.getElementById("bitrateSelect").value);
-                    const fps = parseInt(document.getElementById("fpsSelect").value);
-
-                    // Umrechnung in Bit (z. B. 1.5 Mbit → 1500000)
-                    const bitrate = Math.round(bitrateMbit * 1000000);
-
-                    console.log("Selected settings:");
-                    console.log("Resolution:", resolution);
-                    console.log("FPS:", fps);
-                    console.log("Bitrate (final):", bitrate);
-
-                    voip.setStreamSettings({
-                        resolution: resolution,
-                        bitrate: bitrate,
-                        frameRate: fps,
-                    })
-
-                    voip.shareScreen(true)
-                },
-                ["Save", null],
-                false,
-                400
-            );
-        }
-
-        voip.isScreensharing = !voip.isScreensharing;
-    }
-    catch (error) {
-        console.error(error);
-    }
+    return card;
 }
 
 async function setupVC(roomId) {
-    if (!roomId) {
-        console.warn("cant join voice chat because roomid wasnt set")
-    }
-
-    // vc rooms are special
-    //if(!roomId?.startsWith("vc_")) roomId = `vc_${roomId}`;
+    if (!roomId) return;
 
     const channelIcons = document.getElementById("channelname-icons");
     let contentContainer = document.getElementById("content");
+
     channelIcons.innerHTML = "";
 
     contentContainer.innerHTML = `
-        <div class="vc-container">
-            <div class="vc-row participants">
-               
+        <div class="vc-wrapper" id="vc-wrapper">
+            <div class="vc-grid" id="vc-grid"></div>
+            
+            <div id="vc-fullscreen">
+                <video autoplay playsinline></video>
+                <div class="fs-controls">
+                    <button class="vc-btn" onclick="toggleFullscreenMute(this)">🔊</button>
+                    <button class="vc-btn danger" onclick="closeFullscreen()">✖</button>
+                </div>
             </div>
-            
-            
-            <div class="vc-row screenshares"></div>
+
+            <div class="vc-controls">
+                <button class="vc-btn" onclick="toggleScreenshare()" title="Share Screen">🖥️</button>
+                <button class="vc-btn" onclick="toggleMic()" id="btn-mic" title="Mic">🎙️</button>
+                <button class="vc-btn" onclick="toggleDeafen()" id="btn-deafen" title="Deafen">🎧</button>
+                <button class="vc-btn danger disconnect" onclick="leaveVC()" title="Disconnect">📞</button>
+            </div>
         </div>
     `;
 
-    addVcMember(UserManager.getID());
+    updateUiButtons();
 
-    if(!isInVc){
-        document.querySelector("#vcStatusChannelname").innerText = "";
-        setProfileQaIndicatorStatusText({
-            text: "Connecting to vc...",
-            color: "darkorange"
-        })
-
-        voip.joinRoom(roomId, UserManager.getID());
+    if (!isInVc) {
+        setProfileQaIndicatorStatusText({text: "Connecting...", color: "darkorange"});
+        voip.joinRoom(roomId, UserManager.getID(), UserManager.getID(), UserManager.getChannel());
         connectedVcChannel = roomId;
         isInVc = true;
         toggleProfileQaIndicator(true);
-    }
 
-    channelIcons.insertAdjacentHTML("beforeend", `<div class="screenshare icon" onclick="toggleScreenshare()"></div><div onclick="toggleMic();" class="muteMic icon"></div>`);
+        getOrCreateUserCard(UserManager.getID());
+
+        setTimeout(() => {
+            isDeafened = false;
+            updateUiButtons();
+            rebuildVcUiFromTracks();
+        }, 150);
+    } else {
+        getOrCreateUserCard(UserManager.getID());
+
+        let vcMembers = await getVCMembers(UserManager.getChannel());
+        if (vcMembers?.members) {
+            vcMembers.members.forEach(m => getOrCreateUserCard(m));
+        }
+
+        rebuildVcUiFromTracks();
+
+        setProfileQaIndicatorStatusText({
+            text: `Talking in`,
+            channel: document.querySelector("#channelname")?.innerText || "Voice",
+            color: "#23a55a"
+        });
+
+        updateUiButtons();
+    }
 
     setTimeout(() => {
-        let vcContainer = document.querySelector(".vc-container");
-        vcContainer.style.opacity = "1";
-    }, 10)
+        let w = document.querySelector(".vc-wrapper");
+        if (w) w.style.opacity = "1";
+    }, 50);
 }
 
-function setProfileQaIndicatorStatusText({text, channel = "", color = "#02985f"} = {}){
-    let profileQaIndicatorStatusText = document.querySelector("#profile-qa .row.voip #vcStatusText")
-    let profileQaIndicatorChallenText = document.querySelector("#profile-qa .row.voip #vcStatusChannelname")
+function updateUiButtons() {
+    const isMuted = voip && typeof voip.isMuted === "function" ? voip.isMuted() : false;
 
-    // set status trext
-    profileQaIndicatorStatusText.innerText = text;
-    profileQaIndicatorChallenText.innerText = channel ? channel : "";
+    const micBtn = document.getElementById("btn-mic");
+    const deafBtn = document.getElementById("btn-deafen");
+    const pipMic = document.getElementById("pip-mic");
+    const pipDeaf = document.getElementById("pip-deafen");
+    const channelIconMic = document.querySelector("#channelname-icons .muteMic.icon");
 
-    // optionally do color
-    if(color){
-        let profileQaIndicator = document.querySelector("#profile-qa .row.voip")
-        if(profileQaIndicator) profileQaIndicator.style.backgroundColor = color;
+    if (channelIconMic) channelIconMic.classList.toggle("muted", isMuted);
+
+    if (micBtn) {
+        if (isDeafened) {
+            micBtn.className = "vc-btn deafened";
+            micBtn.innerHTML = "🚫";
+        } else if (isMuted) {
+            micBtn.className = "vc-btn danger";
+            micBtn.innerHTML = "🔇";
+        } else {
+            micBtn.className = "vc-btn";
+            micBtn.innerHTML = "🎙️";
+        }
+    }
+
+    if (deafBtn) deafBtn.className = isDeafened ? "vc-btn danger" : "vc-btn";
+
+    if (pipMic) {
+        if (isDeafened) {
+            pipMic.className = "vc-pip-btn danger";
+            pipMic.innerHTML = "🚫";
+        } else if (isMuted) {
+            pipMic.className = "vc-pip-btn danger";
+            pipMic.innerHTML = "🔇";
+        } else {
+            pipMic.className = "vc-pip-btn";
+            pipMic.innerHTML = "🎙️";
+        }
+    }
+
+    if (pipDeaf) pipDeaf.className = isDeafened ? "vc-pip-btn danger" : "vc-pip-btn";
+}
+
+function checkPipVisibility() {
+    if (!isInVc) {
+        let pip = document.getElementById("vc-pip-overlay");
+        if (pip) pip.style.display = "none";
+        return;
+    }
+
+    let grid = document.getElementById("vc-grid");
+    let currentChannel = UserManager.getChannel();
+    let isDifferentChannel = String(currentChannel) !== String(connectedVcChannel);
+
+    let shouldShow = !grid || isDifferentChannel;
+    togglePip(shouldShow);
+}
+
+function togglePip(show) {
+    const pip = document.getElementById("vc-pip-overlay");
+    if (!pip) return;
+
+    pip.style.display = show ? "flex" : "none";
+    if (!show) {
+        pipLastStream = null;
+        return;
+    }
+
+    let stream = lastScreenStream || lastUserStream || null;
+
+    if (!stream) {
+        const audio = document.querySelector("audio[id^='audio-global-']");
+        if (audio?.srcObject) stream = audio.srcObject;
+    }
+
+    if (stream === pipLastStream) return;
+    pipLastStream = stream;
+
+    const pipContent = document.getElementById("vc-pip-content");
+    pipContent.innerHTML = "";
+
+    if (!stream) {
+        pipContent.innerHTML = `<div style="color:#aaa;font-weight:bold;">Voice Active</div>`;
+        return;
+    }
+
+    const v = document.createElement("video");
+    v.srcObject = stream;
+    v.autoplay = true;
+    v.muted = true;
+    v.playsInline = true;
+    pipContent.appendChild(v);
+    v.play().catch(() => {});
+
+    updateUiButtons();
+}
+
+function initGlobalPip() {
+    let old = document.getElementById("vc-pip-overlay");
+    if (old) old.remove();
+
+    let html = `
+        <div id="vc-pip-overlay">
+            <div id="vc-pip-header">Active Call</div>
+            <div id="vc-pip-content"></div>
+            <div class="vc-pip-actions">
+                <button class="vc-pip-btn" onclick="toggleMic()" id="pip-mic">🎙️</button>
+                <button class="vc-pip-btn" onclick="toggleDeafen()" id="pip-deafen">🎧</button>
+                <button class="vc-pip-btn danger" onclick="leaveVC()">✖</button>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML("beforeend", html);
+    makePipDraggable();
+}
+
+function makePipDraggable() {
+    const el = document.getElementById("vc-pip-overlay");
+    const header = document.getElementById("vc-pip-header");
+    if (!el || !header) return;
+
+    let startX = 0, startY = 0, startLeft = 0, startTop = 0;
+
+    header.onmousedown = (e) => {
+        e.preventDefault();
+
+        const r = el.getBoundingClientRect();
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = r.left;
+        startTop = r.top;
+
+        document.body.style.userSelect = "none";
+        el.style.height = el.getBoundingClientRect().height + "px";
+
+        const onMove = (e) => {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            const w = el.offsetWidth;
+            const h = el.offsetHeight;
+
+            let left = startLeft + dx;
+            let top = startTop + dy;
+
+            const maxLeft = window.innerWidth - w;
+            const maxTop = window.innerHeight - h;
+
+            if (left < 0) left = 0;
+            if (top < 0) top = 0;
+            if (left > maxLeft) left = maxLeft;
+            if (top > maxTop) top = maxTop;
+
+            el.style.left = left + "px";
+            el.style.top = top + "px";
+            el.style.right = "auto";
+            el.style.bottom = "auto";
+        };
+
+        const onUp = () => {
+            document.body.style.userSelect = "";
+            el.style.height = "";
+            document.removeEventListener("mousemove", onMove);
+            document.removeEventListener("mouseup", onUp);
+        };
+
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+    };
+}
+
+async function toggleMic() {
+    if (isDeafened) return;
+    if (!voip || typeof voip.toggleMic !== "function") return;
+
+    await voip.toggleMic();
+
+    updateUiButtons();
+    requestAnimationFrame(updateUiButtons);
+    setTimeout(updateUiButtons, 50);
+}
+
+async function toggleDeafen() {
+    isDeafened = !isDeafened;
+
+    if (isDeafened) await voip.muteMic();
+    else await voip.unmuteMic();
+
+    voip._audioNodes.forEach((node, key) => {
+        if (!node?.gain) return;
+        if (isDeafened) {
+            node.gain.gain.value = 0;
+        } else {
+            const p = voip._volumes.get(key) ?? 100;
+            node.gain.gain.value = p / 100;
+        }
+    });
+
+    document.querySelectorAll("audio[id^='audio-global-']").forEach(a => {
+        a.muted = isDeafened;
+    });
+
+    updateUiButtons();
+}
+
+function leaveVC() {
+    const cid = connectedVcChannel || UserManager.getChannel();
+    const myId = UserManager.getID();
+
+    voip.leaveRoom();
+
+    removeVcMemberFromChannel(cid, myId);
+    emitVcMemberLeft(myId, cid);
+
+    isInVc = false;
+    isDeafened = false;
+    connectedVcChannel = 0;
+    toggleProfileQaIndicator(false);
+    document.getElementById("content").innerHTML = "";
+    document.getElementById("channelname-icons").innerHTML = "";
+    let pip = document.getElementById("vc-pip-overlay");
+    if (pip) pip.style.display = "none";
+    document.querySelectorAll("audio[id^='audio-global-']").forEach(el => {
+        el.srcObject = null;
+        el.remove();
+    });
+
+    try { voip.detachAudio(myId, false); } catch (e) {}
+    try { voip.detachAudio(myId, true); } catch (e) {}
+
+    screenStartTs = {};
+    screenStreams = {};
+    lastScreenOwner = null;
+    lastScreenCreatedAt = 0;
+    lastScreenStream = null;
+    lastUserStream = null;
+}
+
+async function toggleScreenshare() {
+    if (voip.isScreensharing) {
+        await voip.stopScreenshare();
+        return;
+    }
+
+    customPrompts.showPrompt("Stream Settings", `
+       <div style="margin:20px 0;">
+            <div class="prompt-form-group">
+                <label class="prompt-label">Resolution</label>
+                <select id="res" class="prompt-select">
+                    <option value="1280x720">720p</option>
+                    <option value="1920x1080" selected>1080p</option>
+                    <option value="2560x1440">2K (1440p)</option>
+                    <option value="3840x2160">4K (2160p)</option>
+                </select>
+            </div>
+            <div class="prompt-form-group">
+                <label class="prompt-label">FPS</label>
+                <select id="fps" class="prompt-select">
+                    <option value="30">30</option>
+                    <option value="60" selected>60</option>
+                    <option value="120">120</option>
+                </select>
+            </div>
+            <div class="prompt-form-group">
+                <label class="prompt-label">Bitrate</label>
+                <select id="bit" class="prompt-select">
+                    <option value="3000000">3 Mbit</option>
+                    <option value="8000000" selected>8 Mbit</option>
+                    <option value="12000000">12 Mbit</option>
+                    <option value="20000000">20 Mbit</option>
+                    <option value="35000000">35 Mbit</option>
+                    <option value="50000000">50 Mbit</option>
+                </select>
+            </div>
+        </div>
+    `, async () => {
+        voip.setStreamSettings({
+            resolution: document.getElementById("res").value,
+            frameRate: parseInt(document.getElementById("fps").value),
+            maxBitrate: parseInt(document.getElementById("bit").value),
+        });
+
+        try {
+            await voip.shareScreen(true);
+        } catch (e) {
+            console.error(e);
+        }
+    }, ["Start", null], false, 400);
+}
+
+function highlightUser(participantId) {
+    document.querySelectorAll(`.vc-card[data-member-id="${participantId}"]`).forEach(card => {
+        card.classList.add("speaking");
+        setTimeout(() => card.classList.remove("speaking"), 1000);
+    });
+    let profileImg = document.querySelector("#profile-qa-img");
+    if (profileImg) {
+        profileImg.classList.add("speaking");
+        setTimeout(() => profileImg.classList.remove("speaking"), 1000);
     }
 }
 
-function toggleProfileQaIndicator(showOrNah = false){
-    let profileQaIndicator = document.querySelector("#profile-qa .row.voip")
-    if(profileQaIndicator && showOrNah === true){
-        profileQaIndicator.classList.remove("invisible");
+function openFullscreen(memberId, isScreen) {
+    let type = isScreen ? "screen" : "user";
+    let video = document.querySelector(`.vc-card[data-member-id="${memberId}"][data-type="${type}"] video`);
+    if (!video || !video.srcObject) return;
+    let fs = document.getElementById("vc-fullscreen");
+    if (!fs) return;
+
+    fs.querySelector("video").srcObject = video.srcObject;
+    fs.style.display = "flex";
+    fs.setAttribute("data-target", memberId);
+    fs.setAttribute("data-type", type);
+
+    const btn = fs.querySelector(".fs-controls .vc-btn");
+    if (btn) btn.innerHTML = "🔊";
+}
+
+function closeFullscreen() {
+    let fs = document.getElementById("vc-fullscreen");
+    if (fs) {
+        fs.style.display = "none";
+        fs.querySelector("video").srcObject = null;
     }
-    else{
-        profileQaIndicator.classList.add("invisible");
+}
+
+function toggleFullscreenMute(btn) {
+    let fs = document.getElementById("vc-fullscreen");
+    if (!fs) return;
+
+    const mid = fs.getAttribute("data-target");
+    const type = fs.getAttribute("data-type") || "user";
+    const isScreen = type === "screen";
+    if (!mid) return;
+
+    const key = `${mid}:${isScreen ? "screen" : "user"}`;
+
+    if (!fsMuteCache.has(key)) {
+        fsMuteCache.set(key, voip.getVolume(mid, isScreen));
+        voip.setVolume(mid, isScreen, 0);
+        btn.innerHTML = "🔇";
+    } else {
+        const prev = fsMuteCache.get(key);
+        fsMuteCache.delete(key);
+        voip.setVolume(mid, isScreen, prev == null ? 100 : prev);
+        btn.innerHTML = "🔊";
     }
+}
+
+async function getVCMembers(channelId) {
+    return new Promise((resolve) => {
+        socket.emit("getVcChannelMembers", {
+            id: UserManager.getID(),
+            token: UserManager.getToken(),
+            channelId
+        }, (r) => resolve(r));
+    });
+}
+
+function setProfileQaIndicatorStatusText({text, channel, color}) {
+    let st = document.querySelector("#vcStatusText");
+    let ct = document.querySelector("#vcStatusChannelname");
+    let ind = document.querySelector("#profile-qa .row.voip");
+    if (st) st.innerText = text;
+    if (ct) ct.innerText = channel;
+    if (ind && color) ind.style.backgroundColor = color;
+}
+
+function toggleProfileQaIndicator(show) {
+    let el = document.querySelector("#profile-qa .row.voip");
+    if (el) show ? el.classList.remove("invisible") : el.classList.add("invisible");
+}
+
+function emitVcMemberLeft(mid, cid) {
+    socket.emit("notifyVcMemberLeft", {
+        id: UserManager.getID(),
+        token: UserManager.getToken(),
+        channelId: cid || UserManager.getChannel(),
+        memberId: mid
+    });
+}
+
+function checkVcMemberChannel(cid, mid) {
+    let container = document.querySelector(`#channellist li[data-channel-id="${cid}"] .participants`);
+    return {element: container, status: !!container};
+}
+
+async function addVcMemberToChannel(cid, mid) {
+    let check = checkVcMemberChannel(cid, mid);
+    if (!check.status) return;
+    let m = await ChatManager.resolveMember(mid).catch(() => null);
+    if (!m) return;
+    if (!check.element.querySelector(`li[data-member-id='${m.id}']`)) {
+
+        if (m.icon === "null") m.icon = null;
+        check.element.insertAdjacentHTML("beforeend",
+            `<li class="participant" data-member-id="${m.id}"><img class="avatar" src="${m.icon || "/img/default_pfp.png"}">${m.name}</li>`
+        );
+        check.element.style.display = "flex";
+    }
+}
+
+function removeVcMemberFromChannel(cid, mid) {
+    let check = checkVcMemberChannel(cid, mid);
+    if (!check.status) return;
+    check.element.querySelector(`li[data-member-id='${mid}']`)?.remove();
+    if (check.element.querySelectorAll("li").length === 0) check.element.style.display = "none";
+}
+
+async function syncVcChannelMembers(channelId) {
+    const cid = String(channelId);
+    const check = checkVcMemberChannel(cid);
+    if (!check.status) return;
+
+    const res = await getVCMembers(cid).catch(() => null);
+    const list = res?.members || [];
+
+    check.element.innerHTML = "";
+
+    if (list.length === 0) {
+        check.element.style.display = "none";
+        return;
+    }
+
+    for (const mid of list) {
+        const m = await ChatManager.resolveMember(String(mid)).catch(() => null);
+        if (!m) continue;
+
+        if (m.icon === "null") m.icon = null;
+        check.element.insertAdjacentHTML("beforeend",
+            `<li class="participant" data-member-id="${m.id}"><img class="avatar" src="${m.icon || "/img/default_pfp.png"}">${m.name}</li>`
+        );
+    }
+
+    check.element.style.display = check.element.querySelectorAll("li").length > 0 ? "flex" : "none";
+}
+
+async function onChannelUiRendered(channelId) {
+    await syncVcChannelMembers(channelId);
 }

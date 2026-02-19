@@ -1,19 +1,25 @@
-const customPrompts = new Prompt();
-getInviteCodes()
 
-window.getInviteCodes = getInviteCodes;
-window.createAccessCode = createAccessCode;
-window.deleteInvite = deleteInvite;
 
-socket.emit("checkPermission", {id: UserManager.getID(), token: UserManager.getToken(), permission: "manageInvites" }, function (response) {
 
-    if(response.permission == "denied"){
-        window.location.href = window.location.origin + "/settings/server";
-    }
-    else{
-        document.getElementById("pagebody").style.display = "block";
-    }
+document.addEventListener("pagechange", e => {
+    console.log(e.detail.page);
+    if (e.detail.page !== "invites") return;
+
+    initInvites();
 });
+
+function initInvites(){
+    getInviteCodes()
+    socket.emit("checkPermission", {id: UserManager.getID(), token: UserManager.getToken(), permission: "manageInvites" }, function (response) {
+
+        if(response.permission == "denied"){
+            window.location.href = window.location.origin + "/settings/server";
+        }
+        else{
+            document.getElementById("pagebody").style.display = "block";
+        }
+    });
+}
 
 function deleteInvite(code){
     if(!code){
@@ -48,7 +54,7 @@ function getInviteCodes(){
                                                 <td>Valid until</td>
                                                 <td>max uses</td>
                                                 <td>Created by</td>
-                                                <td>Actions</td>
+                                                <td class="actions">Actions</td>
                                             </tr>
                                         </thead> `;
 
@@ -63,7 +69,7 @@ function getInviteCodes(){
                     <td>
                         ${code.createdBy?.name ?
                         `<div style="display: flex; flex-direction: row; justify-content: center; gap: 4px;margin-bottom: 10px;">
-                                <img draggable="false" class="icon" src="${code.createdBy?.icon || '/img/default_icon.png'}" />
+                                <img draggable="false" class="icon" src="${code.createdBy?.author?.icon || '/img/default_pfp.png'}" />
                                 <p style="margin: auto;">
                                     ${code.createdBy?.name}
                                 </p>
@@ -71,7 +77,7 @@ function getInviteCodes(){
                         :
                         code.createdBy}
                     </td>
-                    <td>
+                    <td class="actions">
                         <a onclick="deleteInvite('${key}')">Delete</a>
                     </td>
                 </tr>`

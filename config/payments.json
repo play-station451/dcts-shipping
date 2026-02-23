@@ -1,0 +1,18 @@
+{
+    "paypal": {
+        "sandbox": {
+            "id": "xxx",
+            "secret": "xxx"
+        },
+        "live": {
+            "id": "xxx",
+            "secret": "xxx"
+        },
+        "use_sandbox": true
+    },
+    "coinbase": {
+        "key": "xxx",
+        "webhook": "xxx"
+    },
+    "domain": "http://chat.r3tard.dev"
+}

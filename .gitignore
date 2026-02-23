@@ -2,7 +2,6 @@
 /node_modules
 /config_backups
 /chats
-/configs
 /public/uploads/
 /public/emojis/
 /public/.idea/
@@ -13,7 +12,6 @@
 /cache
 /backups
 /public/img/default_emojis/
-privatekey.json
 
 .idea
 .package-lock.json
